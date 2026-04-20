@@ -1,0 +1,29 @@
+[package]
+name = "game-filters-flatpak"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "In-game post-process filter overlay for Linux"
+
+[dependencies]
+gtk    = { version = "0.9",  package = "gtk4",        features = ["v4_12"] }
+adw    = { version = "0.7",  package = "libadwaita",  features = ["v1_5"] }
+ksni   = "0.2"
+ashpd  = { version = "0.9",  default-features = false, features = ["gtk4", "tokio"] }
+serde  = { version = "1.0",  features = ["derive"] }
+serde_json = "1.0"
+log    = "0.4"
+env_logger = "0.11"
+tokio  = { version = "1",    features = ["rt-multi-thread", "net", "io-util", "sync", "macros", "signal", "time"] }
+futures-util = "0.3"
+thiserror = "1.0"
+libc = "0.2"
+
+[[bin]]
+name = "game-filters-flatpak"
+path = "src/main.rs"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

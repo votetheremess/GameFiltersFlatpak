@@ -1,0 +1,41 @@
+app-id: com.gamefiltersflatpak.App
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: game-filters-flatpak
+finish-args:
+  # Wayland + fallback X11 for GTK.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # System tray (StatusNotifierItem / KStatusNotifierItem via D-Bus).
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.freedesktop.Notifications
+  # XDG GlobalShortcuts portal + core portals.
+  - --talk-name=org.freedesktop.portal.*
+  # IPC socket to the Vulkan layer; both artifacts share this path.
+  - --filesystem=xdg-run/game-filters-flatpak.sock
+  # Per-game profiles + active config.
+  - --filesystem=xdg-config/game-filters-flatpak:create
+  # Scan running games over /proc for the auto-profile matching.
+  - --filesystem=/proc:ro
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  build-args:
+    - --share=network
+  env:
+    CARGO_HOME: /run/build/game-filters-flatpak/cargo
+modules:
+  - name: game-filters-flatpak
+    buildsystem: simple
+    build-commands:
+      - cargo --offline fetch --manifest-path frontend/Cargo.toml --verbose
+      - cargo --offline build --release --manifest-path frontend/Cargo.toml
+      - install -Dm755 frontend/target/release/game-filters-flatpak ${FLATPAK_DEST}/bin/game-filters-flatpak
+      - install -Dm644 frontend/data/com.gamefiltersflatpak.App.desktop ${FLATPAK_DEST}/share/applications/com.gamefiltersflatpak.App.desktop
+      - install -Dm644 frontend/data/com.gamefiltersflatpak.App.metainfo.xml ${FLATPAK_DEST}/share/metainfo/com.gamefiltersflatpak.App.metainfo.xml
+    sources:
+      - type: dir
+        path: ..

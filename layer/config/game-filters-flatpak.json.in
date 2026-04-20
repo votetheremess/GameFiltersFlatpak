@@ -1,0 +1,18 @@
+{
+  "file_format_version" : "1.0.0",
+  "layer" : {
+    "name": "VK_LAYER_GAMEFILTERSFLATPAK_post_processing",
+    "type": "GLOBAL",
+    "library_path": "libgamefiltersflatpak.so",
+    "api_version": "1.4.341",
+    "implementation_version": "1",
+    "description": "GameFiltersFlatpak post-processing layer (Nvidia Freestyle-style filters for Linux)",
+    "functions": {
+      "vkGetInstanceProcAddr": "gff_GetInstanceProcAddr",
+      "vkGetDeviceProcAddr":   "gff_GetDeviceProcAddr"
+    },
+    "disable_environment": {
+      "GFF_DISABLE": "1"
+    }
+  }
+}

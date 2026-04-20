@@ -1,0 +1,47 @@
+# Meson / Ninja
+build/
+builddir/
+_build/
+subprojects/packagecache/
+subprojects/*/
+
+# Rust / Cargo
+target/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Compiled objects / libraries
+*.o
+*.so
+*.so.*
+*.a
+*.dylib
+
+# Flatpak
+.flatpak-builder/
+build-flatpak/
+repo/
+*.flatpak
+
+# Shader intermediates
+*.spv
+*.fxc
+
+# IDE / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Local config / secrets
+.env
+.env.local

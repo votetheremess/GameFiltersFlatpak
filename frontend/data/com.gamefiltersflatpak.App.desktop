@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Nvidia Filters
+GenericName=In-Game Filter Overlay
+Comment=Press a hotkey in any Vulkan game to adjust color, contrast, and sharpening live
+Exec=game-filters-flatpak
+Icon=com.gamefiltersflatpak.App
+Categories=Utility;Graphics;Game;
+Terminal=false
+StartupNotify=true
+X-GNOME-UsesNotifications=true

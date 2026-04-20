@@ -1,0 +1,573 @@
+#include "imgui_overlay.hpp"
+#include "effects/effect_registry.hpp"
+#include "settings_manager.hpp"
+#include "logger.hpp"
+#include "mouse_input.hpp"
+#include "keyboard_input.hpp"
+#include "input_blocker.hpp"
+#include "config_serializer.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <fstream>
+
+#include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
+#include "imgui/backends/imgui_impl_vulkan.h"
+
+#include "theme_gff.hpp"
+#include "profile_manager.hpp"
+
+namespace vkBasalt
+{
+    // Dummy function for Vulkan functions not in vkBasalt's dispatch
+    static void dummyVulkanFunc() {}
+
+    // Function loader using vkBasalt's dispatch tables
+    static PFN_vkVoidFunction imguiVulkanLoaderDummy(const char* function_name, void* user_data)
+    {
+        LogicalDevice* device = static_cast<LogicalDevice*>(user_data);
+
+        // Device functions from vkBasalt's dispatch table
+        #define CHECK_FUNC(name) if (strcmp(function_name, "vk" #name) == 0) return (PFN_vkVoidFunction)device->vkd.name
+
+        CHECK_FUNC(AllocateCommandBuffers);
+        CHECK_FUNC(AllocateDescriptorSets);
+        CHECK_FUNC(AllocateMemory);
+        CHECK_FUNC(BeginCommandBuffer);
+        CHECK_FUNC(BindBufferMemory);
+        CHECK_FUNC(BindImageMemory);
+        CHECK_FUNC(CmdBeginRenderPass);
+        CHECK_FUNC(CmdBindDescriptorSets);
+        CHECK_FUNC(CmdBindIndexBuffer);
+        CHECK_FUNC(CmdBindPipeline);
+        CHECK_FUNC(CmdBindVertexBuffers);
+        CHECK_FUNC(CmdCopyBufferToImage);
+        CHECK_FUNC(CmdDrawIndexed);
+        CHECK_FUNC(CmdEndRenderPass);
+        CHECK_FUNC(CmdPipelineBarrier);
+        CHECK_FUNC(CmdPushConstants);
+        CHECK_FUNC(CmdSetScissor);
+        CHECK_FUNC(CmdSetViewport);
+        CHECK_FUNC(CreateBuffer);
+        CHECK_FUNC(CreateCommandPool);
+        CHECK_FUNC(CreateDescriptorPool);
+        CHECK_FUNC(CreateDescriptorSetLayout);
+        CHECK_FUNC(CreateFence);
+        CHECK_FUNC(CreateFramebuffer);
+        CHECK_FUNC(CreateGraphicsPipelines);
+        CHECK_FUNC(CreateImage);
+        CHECK_FUNC(CreateImageView);
+        CHECK_FUNC(CreatePipelineLayout);
+        CHECK_FUNC(CreateRenderPass);
+        CHECK_FUNC(CreateSampler);
+        CHECK_FUNC(CreateSemaphore);
+        CHECK_FUNC(CreateShaderModule);
+        CHECK_FUNC(CreateSwapchainKHR);
+        CHECK_FUNC(DestroyBuffer);
+        CHECK_FUNC(DestroyCommandPool);
+        CHECK_FUNC(DestroyDescriptorPool);
+        CHECK_FUNC(DestroyDescriptorSetLayout);
+        CHECK_FUNC(DestroyFence);
+        CHECK_FUNC(DestroyFramebuffer);
+        CHECK_FUNC(DestroyImage);
+        CHECK_FUNC(DestroyImageView);
+        CHECK_FUNC(DestroyPipeline);
+        CHECK_FUNC(DestroyPipelineLayout);
+        CHECK_FUNC(DestroyRenderPass);
+        CHECK_FUNC(DestroySampler);
+        CHECK_FUNC(DestroySemaphore);
+        CHECK_FUNC(DestroyShaderModule);
+        CHECK_FUNC(DestroySwapchainKHR);
+        CHECK_FUNC(EndCommandBuffer);
+        CHECK_FUNC(FlushMappedMemoryRanges);
+        CHECK_FUNC(FreeCommandBuffers);
+        CHECK_FUNC(FreeDescriptorSets);
+        CHECK_FUNC(FreeMemory);
+        CHECK_FUNC(GetBufferMemoryRequirements);
+        CHECK_FUNC(GetDeviceQueue);
+        CHECK_FUNC(GetImageMemoryRequirements);
+        CHECK_FUNC(GetSwapchainImagesKHR);
+        CHECK_FUNC(MapMemory);
+        CHECK_FUNC(QueueSubmit);
+        CHECK_FUNC(QueueWaitIdle);
+        CHECK_FUNC(ResetCommandPool);
+        CHECK_FUNC(ResetFences);
+        CHECK_FUNC(UnmapMemory);
+        CHECK_FUNC(UpdateDescriptorSets);
+        CHECK_FUNC(WaitForFences);
+
+        #undef CHECK_FUNC
+
+        // Instance functions from vkBasalt's dispatch
+        #define CHECK_IFUNC(name) if (strcmp(function_name, "vk" #name) == 0) return (PFN_vkVoidFunction)device->vki.name
+        CHECK_IFUNC(GetPhysicalDeviceMemoryProperties);
+        CHECK_IFUNC(GetPhysicalDeviceProperties);
+        CHECK_IFUNC(GetPhysicalDeviceQueueFamilyProperties);
+        #undef CHECK_IFUNC
+
+        // Return dummy for all remaining functions - don't use GetInstanceProcAddr
+        // (GetInstanceProcAddr causes rendering issues)
+        return (PFN_vkVoidFunction)dummyVulkanFunc;
+    }
+
+    ImGuiOverlay::ImGuiOverlay(LogicalDevice* device, VkFormat swapchainFormat, uint32_t imageCount, OverlayPersistentState* persistentState)
+        : pLogicalDevice(device), pPersistentState(persistentState)
+    {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        io.IniFilename = nullptr;
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;  // Enable docking
+
+        std::string iniPath = ConfigSerializer::getBaseConfigDir() + "/imgui.ini";
+
+        // Load ini file and check if it has docking data
+        std::ifstream iniFile(iniPath);
+        std::string iniContent((std::istreambuf_iterator<char>(iniFile)),
+                                std::istreambuf_iterator<char>());
+
+        if (!iniContent.empty())
+            ImGui::LoadIniSettingsFromDisk(iniPath.c_str());
+
+        // Only skip default layout if ini has actual docking data
+        if (iniContent.find("[Docking]") != std::string::npos)
+            dockLayoutInitialized = true;
+
+        // Load a real TTF from the system (Inter / Cantarell / Noto / DejaVu)
+        // at 16px — ImGui's default ProggyClean at 13px is too small on modern
+        // displays. Must happen before initVulkanBackend() because that
+        // uploads the font atlas to the GPU.
+        gff::loadFonts();
+
+        // Apply our project's overlay theme (translucent window, hairline
+        // border, cool-cyan accents) instead of the default ImGui Dark theme.
+        gff::applyOverlayTheme();
+
+        initVulkanBackend(swapchainFormat, imageCount);
+
+        // Restore UI preferences from persistent state
+        if (pPersistentState)
+            visible = pPersistentState->visible;
+
+        initialized = true;
+        Logger::info("ImGui overlay initialized");
+    }
+
+    ImGuiOverlay::~ImGuiOverlay()
+    {
+        if (!initialized) return;
+
+        pLogicalDevice->vkd.QueueWaitIdle(pLogicalDevice->queue);
+
+        std::string iniPath = ConfigSerializer::getBaseConfigDir() + "/imgui.ini";
+        ImGui::SaveIniSettingsToDisk(iniPath.c_str());
+
+        if (backendInitialized)
+            ImGui_ImplVulkan_Shutdown();
+        ImGui::DestroyContext();
+
+        for (auto fence : commandBufferFences)
+        {
+            if (fence != VK_NULL_HANDLE)
+                pLogicalDevice->vkd.DestroyFence(pLogicalDevice->device, fence, nullptr);
+        }
+        if (commandPool != VK_NULL_HANDLE)
+            pLogicalDevice->vkd.DestroyCommandPool(pLogicalDevice->device, commandPool, nullptr);
+        if (renderPass != VK_NULL_HANDLE)
+            pLogicalDevice->vkd.DestroyRenderPass(pLogicalDevice->device, renderPass, nullptr);
+        if (descriptorPool != VK_NULL_HANDLE)
+            pLogicalDevice->vkd.DestroyDescriptorPool(pLogicalDevice->device, descriptorPool, nullptr);
+
+        Logger::info("ImGui overlay destroyed");
+    }
+
+    void ImGuiOverlay::toggle()
+    {
+        visible = !visible;
+        setInputBlocked(visible);
+        saveToPersistentState();
+    }
+
+    void ImGuiOverlay::saveToPersistentState()
+    {
+        if (!pPersistentState)
+            return;
+
+        // Only save UI preferences - effect state is in the registry, settings in settingsManager
+        pPersistentState->visible = visible;
+    }
+
+    void ImGuiOverlay::updateState(OverlayState newState)
+    {
+        state = std::move(newState);
+
+        if (!pEffectRegistry)
+            return;
+
+        // Registry is already initialized from config at swapchain creation
+        // Just ensure any newly added effects are in the registry
+        const auto& selectedEffects = pEffectRegistry->getSelectedEffects();
+        for (const auto& effectName : selectedEffects)
+        {
+            if (!pEffectRegistry->hasEffect(effectName))
+                pEffectRegistry->ensureEffect(effectName);
+        }
+        // No editableParams merging needed - Registry IS the source of truth
+    }
+
+    std::vector<std::unique_ptr<EffectParam>> ImGuiOverlay::getModifiedParams()
+    {
+        if (!pEffectRegistry)
+            return {};
+        return pEffectRegistry->getAllParameters();
+    }
+
+    std::vector<std::string> ImGuiOverlay::getActiveEffects() const
+    {
+        std::vector<std::string> activeEffects;
+        if (!pEffectRegistry)
+            return activeEffects;
+
+        for (const auto& effectName : pEffectRegistry->getSelectedEffects())
+        {
+            if (pEffectRegistry->isEffectEnabled(effectName))
+                activeEffects.push_back(effectName);
+        }
+        return activeEffects;
+    }
+
+    const std::vector<std::string>& ImGuiOverlay::getSelectedEffects() const
+    {
+        static std::vector<std::string> empty;
+        return pEffectRegistry ? pEffectRegistry->getSelectedEffects() : empty;
+    }
+
+    void ImGuiOverlay::saveCurrentConfig()
+    {
+        if (!pEffectRegistry)
+            return;
+
+        const auto& selectedEffects = pEffectRegistry->getSelectedEffects();
+
+        // Collect parameters that differ from defaults using polymorphic interface
+        std::vector<ConfigParam> params;
+        for (const auto& effectName : selectedEffects)
+        {
+            for (auto* p : pEffectRegistry->getParametersForEffect(effectName))
+            {
+                if (!p->hasChanged())
+                    continue;
+
+                // Use polymorphic serialize method - may return multiple values (e.g., Float2 returns .x and .y)
+                auto serialized = p->serialize();
+                for (const auto& [suffix, value] : serialized)
+                {
+                    ConfigParam cp;
+                    cp.effectName = p->effectName;
+                    // For multi-component params, suffix contains ".x", ".y", etc.
+                    // For single-component params, suffix is empty
+                    cp.paramName = suffix.empty() ? p->name : suffix;
+                    cp.value = value;
+                    params.push_back(cp);
+                }
+            }
+        }
+
+        // Collect disabled effects (from registry)
+        std::vector<std::string> disabledEffects;
+        for (const auto& effect : selectedEffects)
+        {
+            if (!pEffectRegistry->isEffectEnabled(effect))
+                disabledEffects.push_back(effect);
+        }
+
+        // Collect effect paths/types for serialization
+        std::map<std::string, std::string> effectPaths;
+        std::vector<PreprocessorDefinition> allDefs;
+        for (const auto& effectName : selectedEffects)
+        {
+            if (pEffectRegistry->isEffectBuiltIn(effectName))
+            {
+                std::string effectType = pEffectRegistry->getEffectType(effectName);
+                if (!effectType.empty())
+                    effectPaths[effectName] = effectType;
+            }
+            else
+            {
+                std::string path = pEffectRegistry->getEffectFilePath(effectName);
+                if (!path.empty())
+                    effectPaths[effectName] = path;
+
+                const auto& defs = pEffectRegistry->getPreprocessorDefs(effectName);
+                for (const auto& def : defs)
+                    allDefs.push_back(def);
+            }
+        }
+
+        ConfigSerializer::saveConfig(saveConfigName, selectedEffects, disabledEffects, params, effectPaths, allDefs);
+    }
+
+    void ImGuiOverlay::setSelectedEffects(const std::vector<std::string>& effects,
+                                          const std::vector<std::string>& disabledEffects)
+    {
+        if (!pEffectRegistry)
+            return;
+
+        pEffectRegistry->setSelectedEffects(effects);
+
+        // Build set of disabled effects for quick lookup
+        std::set<std::string> disabledSet(disabledEffects.begin(), disabledEffects.end());
+
+        // Set enabled states in registry: disabled if in disabledEffects, enabled otherwise
+        for (const auto& effectName : effects)
+        {
+            bool enabled = (disabledSet.find(effectName) == disabledSet.end());
+            pEffectRegistry->setEffectEnabled(effectName, enabled);
+        }
+    }
+
+    void ImGuiOverlay::initVulkanBackend(VkFormat swapchainFormat, uint32_t imageCount)
+    {
+        // Load Vulkan functions for ImGui using vkBasalt's dispatch tables
+        bool loaded = ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_3, imguiVulkanLoaderDummy, pLogicalDevice);
+        if (!loaded)
+        {
+            Logger::err("Failed to load Vulkan functions for ImGui");
+            return;
+        }
+        Logger::debug("ImGui Vulkan functions loaded");
+
+        // Create descriptor pool for ImGui
+        VkDescriptorPoolSize poolSizes[] = {
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 }
+        };
+
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        poolInfo.maxSets = 100;
+        poolInfo.poolSizeCount = 1;
+        poolInfo.pPoolSizes = poolSizes;
+
+        pLogicalDevice->vkd.CreateDescriptorPool(pLogicalDevice->device, &poolInfo, nullptr, &descriptorPool);
+
+        // Create render pass for ImGui
+        VkAttachmentDescription attachment = {};
+        attachment.format = swapchainFormat;
+        attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachment.initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        VkAttachmentReference colorRef = {};
+        colorRef.attachment = 0;
+        colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpass = {};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &colorRef;
+
+        VkSubpassDependency dependency = {};
+        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.dstSubpass = 0;
+        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.srcAccessMask = 0;
+        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        VkRenderPassCreateInfo renderPassInfo = {};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = 1;
+        renderPassInfo.pAttachments = &attachment;
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpass;
+        renderPassInfo.dependencyCount = 1;
+        renderPassInfo.pDependencies = &dependency;
+
+        pLogicalDevice->vkd.CreateRenderPass(pLogicalDevice->device, &renderPassInfo, nullptr, &renderPass);
+
+        // Initialize ImGui Vulkan backend
+        ImGui_ImplVulkan_InitInfo initInfo = {};
+        initInfo.ApiVersion = VK_API_VERSION_1_3;
+        initInfo.Instance = pLogicalDevice->instance;
+        initInfo.PhysicalDevice = pLogicalDevice->physicalDevice;
+        initInfo.Device = pLogicalDevice->device;
+        initInfo.QueueFamily = pLogicalDevice->queueFamilyIndex;
+        initInfo.Queue = pLogicalDevice->queue;
+        initInfo.DescriptorPool = descriptorPool;
+        initInfo.MinImageCount = 2;
+        initInfo.ImageCount = 2;
+        initInfo.PipelineInfoMain.RenderPass = renderPass;
+
+        ImGui_ImplVulkan_Init(&initInfo);
+        backendInitialized = true;
+
+        this->swapchainFormat = swapchainFormat;
+        this->imageCount = imageCount;
+
+        // Create command pool
+        VkCommandPoolCreateInfo poolCreateInfo = {};
+        poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        poolCreateInfo.queueFamilyIndex = pLogicalDevice->queueFamilyIndex;
+        pLogicalDevice->vkd.CreateCommandPool(pLogicalDevice->device, &poolCreateInfo, nullptr, &commandPool);
+
+        // Allocate command buffers
+        commandBuffers.resize(imageCount);
+        VkCommandBufferAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = commandPool;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = imageCount;
+        pLogicalDevice->vkd.AllocateCommandBuffers(pLogicalDevice->device, &allocInfo, commandBuffers.data());
+
+        // Create fences for command buffer synchronization (signaled initially so first frame doesn't wait)
+        commandBufferFences.resize(imageCount);
+        VkFenceCreateInfo fenceInfo = {};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        for (uint32_t i = 0; i < imageCount; i++)
+            pLogicalDevice->vkd.CreateFence(pLogicalDevice->device, &fenceInfo, nullptr, &commandBufferFences[i]);
+
+        Logger::debug("ImGui Vulkan backend initialized");
+    }
+
+    VkCommandBuffer ImGuiOverlay::recordFrame(uint32_t imageIndex, VkImageView imageView, uint32_t width, uint32_t height)
+    {
+        if (!backendInitialized || !visible)
+            return VK_NULL_HANDLE;
+
+        // Store current resolution for VRAM estimates in settings
+        currentWidth = width;
+        currentHeight = height;
+
+        // Wait for previous use of this command buffer to complete
+        VkFence fence = commandBufferFences[imageIndex];
+        pLogicalDevice->vkd.WaitForFences(pLogicalDevice->device, 1, &fence, VK_TRUE, UINT64_MAX);
+        pLogicalDevice->vkd.ResetFences(pLogicalDevice->device, 1, &fence);
+
+        VkCommandBuffer cmd = commandBuffers[imageIndex];
+
+        // Begin command buffer
+        VkCommandBufferBeginInfo beginInfo = {};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        pLogicalDevice->vkd.BeginCommandBuffer(cmd, &beginInfo);
+
+        // Create framebuffer for this image view
+        VkFramebuffer framebuffer;
+        VkFramebufferCreateInfo fbInfo = {};
+        fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        fbInfo.renderPass = renderPass;
+        fbInfo.attachmentCount = 1;
+        fbInfo.pAttachments = &imageView;
+        fbInfo.width = width;
+        fbInfo.height = height;
+        fbInfo.layers = 1;
+        pLogicalDevice->vkd.CreateFramebuffer(pLogicalDevice->device, &fbInfo, nullptr, &framebuffer);
+
+        // Set display size and mouse input BEFORE NewFrame
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = ImVec2((float)width, (float)height);
+
+        // Mouse input for interactivity
+        MouseState mouse = getMouseState();
+        io.MousePos = ImVec2((float)mouse.x, (float)mouse.y);
+        io.MouseDown[0] = mouse.leftButton;
+        io.MouseDown[1] = mouse.rightButton;
+        io.MouseDown[2] = mouse.middleButton;
+        io.MouseWheel = mouse.scrollDelta;
+        io.MouseDrawCursor = true;  // Draw software cursor (games often hide the OS cursor)
+
+        // Keyboard input for text fields
+        // Keys are one-shot events, so we send press and release in same frame
+        KeyboardState keyboard = getKeyboardState();
+        for (char c : keyboard.typedChars)
+            io.AddInputCharacter(c);
+        if (keyboard.backspace) { io.AddKeyEvent(ImGuiKey_Backspace, true); io.AddKeyEvent(ImGuiKey_Backspace, false); }
+        if (keyboard.del) { io.AddKeyEvent(ImGuiKey_Delete, true); io.AddKeyEvent(ImGuiKey_Delete, false); }
+        if (keyboard.enter) { io.AddKeyEvent(ImGuiKey_Enter, true); io.AddKeyEvent(ImGuiKey_Enter, false); }
+        if (keyboard.left) { io.AddKeyEvent(ImGuiKey_LeftArrow, true); io.AddKeyEvent(ImGuiKey_LeftArrow, false); }
+        if (keyboard.right) { io.AddKeyEvent(ImGuiKey_RightArrow, true); io.AddKeyEvent(ImGuiKey_RightArrow, false); }
+        if (keyboard.home) { io.AddKeyEvent(ImGuiKey_Home, true); io.AddKeyEvent(ImGuiKey_Home, false); }
+        if (keyboard.end) { io.AddKeyEvent(ImGuiKey_End, true); io.AddKeyEvent(ImGuiKey_End, false); }
+
+        // ImGui frame
+        ImGui_ImplVulkan_NewFrame();
+        ImGui::NewFrame();
+
+        // Left-edge sidebar: position locked to top-left of the game's
+        // viewport, height locked to full viewport height, width only is
+        // user-resizable (drag the right edge). Clamping both min.y and
+        // max.y to WorkSize.y pins the height even when the user drags the
+        // resize grip. Re-applied each frame so a resolution / viewport
+        // change adapts cleanly.
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        const float kInitialWidth = 470.0f;   // wider default so reset buttons fit
+        const float kMinWidth = 360.0f;
+        const float kMaxWidth = 720.0f;
+
+        ImGui::SetNextWindowPos(viewport->WorkPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(kInitialWidth, viewport->WorkSize.y), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSizeConstraints(
+            ImVec2(kMinWidth, viewport->WorkSize.y),
+            ImVec2(kMaxWidth, viewport->WorkSize.y));
+
+        ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove
+                               | ImGuiWindowFlags_NoCollapse
+                               | ImGuiWindowFlags_NoDocking
+                               | ImGuiWindowFlags_NoBringToFrontOnFocus;
+        if (ImGui::Begin("Nvidia Filters", nullptr, flags))
+        {
+            renderMainView(keyboard);
+        }
+        ImGui::End();
+
+        // Global auto-apply check (runs regardless of which tab is active)
+        if (settingsManager.getAutoApply() && paramsDirty)
+        {
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastChangeTime).count();
+            if (elapsed >= settingsManager.getAutoApplyDelay())
+            {
+                applyRequested = true;
+                paramsDirty = false;
+            }
+        }
+
+        // Focus our overlay window on first frame of the session.
+        static bool firstFrame = true;
+        if (firstFrame)
+        {
+            ImGui::SetWindowFocus("Nvidia Filters");
+            firstFrame = false;
+        }
+
+        ImGui::Render();
+
+        // Begin render pass
+        VkRenderPassBeginInfo rpBegin = {};
+        rpBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        rpBegin.renderPass = renderPass;
+        rpBegin.framebuffer = framebuffer;
+        rpBegin.renderArea.extent.width = width;
+        rpBegin.renderArea.extent.height = height;
+
+        pLogicalDevice->vkd.CmdBeginRenderPass(cmd, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+        pLogicalDevice->vkd.CmdEndRenderPass(cmd);
+
+        pLogicalDevice->vkd.EndCommandBuffer(cmd);
+
+        // Destroy framebuffer (created per-frame)
+        pLogicalDevice->vkd.DestroyFramebuffer(pLogicalDevice->device, framebuffer, nullptr);
+
+        return cmd;
+    }
+
+} // namespace vkBasalt
