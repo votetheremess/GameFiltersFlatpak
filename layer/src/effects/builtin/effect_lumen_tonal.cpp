@@ -16,21 +16,23 @@ namespace vkBasalt
         // lumen_tonal.frag.glsl.
         struct LumenTonalParams
         {
-            float exposure;    // [-100, 100]
-            float contrast;    // [-100, 100]
-            float highlights;  // [-100, 100]
-            float shadows;     // [-100, 100]
-            float gamma;       // [-100, 100]
+            float exposure;     // [-100, 100]
+            float contrast;     // [-100, 100]
+            float highlights;   // [-100, 100]
+            float shadows;      // [-100, 100]
+            float gamma;        // [-100, 100]
+            float darkShadows;  // [-100, 100]
         };
 
         LumenTonalParams readParams(Config* pConfig)
         {
             return LumenTonalParams{
-                pConfig->getOption<float>("lumen.exposure",   0.0f),
-                pConfig->getOption<float>("lumen.contrast",   0.0f),
-                pConfig->getOption<float>("lumen.highlights", 0.0f),
-                pConfig->getOption<float>("lumen.shadows",    0.0f),
-                pConfig->getOption<float>("lumen.gamma",      0.0f),
+                pConfig->getOption<float>("lumen.exposure",    0.0f),
+                pConfig->getOption<float>("lumen.contrast",    0.0f),
+                pConfig->getOption<float>("lumen.highlights",  0.0f),
+                pConfig->getOption<float>("lumen.shadows",     0.0f),
+                pConfig->getOption<float>("lumen.gamma",       0.0f),
+                pConfig->getOption<float>("lumen.darkShadows", 0.0f),
             };
         }
     } // namespace

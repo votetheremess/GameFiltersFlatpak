@@ -153,16 +153,17 @@ namespace vkBasalt
             }
         };
 
-        // Tonal: Exposure, Contrast, Highlights, Shadows, Gamma.
+        // Tonal: Exposure, Contrast, Highlights, Shadows, Gamma, Deep Shadows.
         effects["lumen_tonal"] = {
             "lumen_tonal",
             false,
             {
-                {"lumen.exposure",   "Exposure",   ParamType::Float, 0.0f, -100.0f, 100.0f},
-                {"lumen.contrast",   "Contrast",   ParamType::Float, 0.0f, -100.0f, 100.0f},
-                {"lumen.highlights", "Highlights", ParamType::Float, 0.0f, -100.0f, 100.0f},
-                {"lumen.shadows",    "Shadows",    ParamType::Float, 0.0f, -100.0f, 100.0f},
-                {"lumen.gamma",      "Gamma",      ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.exposure",    "Exposure",     ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.contrast",    "Contrast",     ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.highlights",  "Highlights",   ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.shadows",     "Shadows",      ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.gamma",       "Gamma",        ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.darkShadows", "Deep Shadows", ParamType::Float, 0.0f, -100.0f, 100.0f},
             },
             [](LogicalDevice* dev, VkFormat fmt, VkExtent2D ext,
                std::vector<VkImage> in, std::vector<VkImage> out, Config* cfg) {

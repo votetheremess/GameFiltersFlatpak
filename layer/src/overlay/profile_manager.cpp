@@ -48,11 +48,12 @@ namespace lumen
                     "lumen_tonal",
                     "Brightness / Contrast",
                     {
-                        {"lumen.exposure",   "Exposure",   "%.0f"},
-                        {"lumen.contrast",   "Contrast",   "%.0f"},
-                        {"lumen.highlights", "Highlights", "%.0f"},
-                        {"lumen.shadows",    "Shadows",    "%.0f"},
-                        {"lumen.gamma",      "Gamma",      "%.0f"},
+                        {"lumen.exposure",    "Exposure",     "%.0f"},
+                        {"lumen.contrast",    "Contrast",     "%.0f"},
+                        {"lumen.highlights",  "Highlights",   "%.0f"},
+                        {"lumen.shadows",     "Shadows",      "%.0f"},
+                        {"lumen.darkShadows", "Deep Shadows", "%.0f"},
+                        {"lumen.gamma",       "Gamma",        "%.0f"},
                     },
                 },
                 {
