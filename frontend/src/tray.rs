@@ -14,17 +14,17 @@ pub enum TrayCommand {
     Quit,
 }
 
-struct GffTray {
+struct LumenTray {
     tx: mpsc::Sender<TrayCommand>,
 }
 
-impl Tray for GffTray {
+impl Tray for LumenTray {
     fn id(&self) -> String {
-        "com.gamefiltersflatpak.App".into()
+        "io.github.votetheremess.Lumen".into()
     }
 
     fn title(&self) -> String {
-        "Game Filters".into()
+        "Lumen".into()
     }
 
     fn icon_name(&self) -> String {
@@ -34,7 +34,7 @@ impl Tray for GffTray {
     fn tool_tip(&self) -> ksni::ToolTip {
         ksni::ToolTip {
             icon_name: "video-display-symbolic".into(),
-            title: "Game Filters".into(),
+            title: "Lumen".into(),
             description: "Click to show window".into(),
             icon_pixmap: vec![],
         }
@@ -90,7 +90,7 @@ impl Tray for GffTray {
 /// is drained on the GTK main thread via a `glib::timeout_add_local`.
 pub fn spawn() -> mpsc::Receiver<TrayCommand> {
     let (tx, rx) = mpsc::channel();
-    let service = TrayService::new(GffTray { tx });
+    let service = TrayService::new(LumenTray { tx });
     service.spawn();
     log::info!("tray service spawned");
     rx

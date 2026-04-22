@@ -46,7 +46,7 @@
 #include "ipc.hpp"
 #include "overlay/profile_manager.hpp"
 
-#define GFF_NAME "VK_LAYER_GAMEFILTERSFLATPAK_post_processing"
+#define LUMEN_NAME "VK_LAYER_LUMEN_post_processing"
 
 #if defined(__GNUC__) && __GNUC__ >= 4
 #define VK_BASALT_EXPORT __attribute__((visibility("default")))
@@ -75,7 +75,7 @@ namespace vkBasalt
     // other games) connects as a *client* to the frontend's server socket.
     // The frontend broadcasts commands to all connected clients; whichever
     // process is actually rendering a game consumes the toggle flag.
-    gff::IpcClient       g_ipcClient;
+    lumen::IpcClient       g_ipcClient;
     std::atomic<bool>    g_ipcClientStarted{false};
     std::atomic<bool>    g_ipcToggleOverlay{false};
     std::atomic<bool>    g_ipcShowOverlay{false};
@@ -96,7 +96,7 @@ namespace vkBasalt
             return;
 
         bool ok = g_ipcClient.start(
-            [](const gff::FrontendCommand& cmd) {
+            [](const lumen::FrontendCommand& cmd) {
                 if (cmd.type == "show-overlay")
                     g_ipcShowOverlay.store(true, std::memory_order_release);
                 else if (cmd.type == "hide-overlay")
@@ -107,6 +107,8 @@ namespace vkBasalt
                     Logger::info("ipc: load-profile received");
                 else if (cmd.type == "param-updated")
                     {}
+                else if (cmd.type == "games-enabled-update")
+                    lumen::applyEnabledGamesJson(cmd.raw_json);
                 else
                     Logger::debug("ipc: unknown command type: " + cmd.type);
             },
@@ -267,7 +269,7 @@ namespace vkBasalt
         std::string currentConfigPath;
 
         // 1. Check env var
-        const char* envConfig = std::getenv("GFF_CONFIG_FILE");
+        const char* envConfig = std::getenv("LUMEN_CONFIG_FILE");
         if (envConfig && *envConfig)
         {
             currentConfigPath = envConfig;
@@ -725,7 +727,7 @@ namespace vkBasalt
         // startup that drowned the frontend log in "early eof" noise and
         // made real crashes invisible. Gated on isGameProcess() so only
         // processes that actually want filters establish a connection.
-        if (gff::isGameProcess())
+        if (lumen::isGameProcess())
             startIpcClientOnce();
 
         return ret;
@@ -923,23 +925,28 @@ namespace vkBasalt
         // Pass-through bypass. As an *implicit* Vulkan layer we load into
         // every Vulkan process on the system — Wine/Proton games, native
         // Linux apps that happen to use Vulkan (GTK4 apps, the KDE
-        // compositor, SteelSeries-style utilities), system tools. Two
+        // compositor, SteelSeries-style utilities), system tools. Three
         // conditions each force full bypass:
-        //   1. This isn't a game process (gff::isGameProcess() == false).
+        //   1. This isn't a game process (lumen::isGameProcess() == false).
         //      Non-game apps shouldn't receive overlay broadcasts and
         //      shouldn't have their frames mutated.
         //   2. The frontend IPC socket isn't reachable. Without it we
         //      have no profile data, no way to receive slider changes,
         //      and no business touching the swapchain. Also the Wine
         //      assertion-on-non-success QueuePresentKHR path hits here.
+        //   3. This game isn't in the user's enabled-games list
+        //      (toggled OFF in the frontend scanner). Lumen is opt-in
+        //      per-game — matches Nvidia App's model.
         // When bypassed we forward the create-info untouched and store a
         // minimal LogicalSwapchain with bypassLayer=true; every hook
         // thereafter treats it as invisible.
-        if (!gff::isGameProcess() || !gff::frontendAvailable())
+        if (!lumen::isGameProcess() || !lumen::frontendAvailable() || !lumen::isGameEnabled())
         {
-            const char* reason = !gff::isGameProcess()
+            const char* reason = !lumen::isGameProcess()
                 ? "not a game process"
-                : "frontend unreachable";
+                : !lumen::frontendAvailable()
+                ? "frontend unreachable"
+                : "game not in enabled list";
             Logger::info(std::string("installing pass-through swapchain; reason: ") + reason);
             VkResult bypassResult = pLogicalDevice->vkd.CreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain);
             std::shared_ptr<LogicalSwapchain> pBypassSwapchain(new LogicalSwapchain());
@@ -982,7 +989,7 @@ namespace vkBasalt
         modifiedCreateInfo.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
         Logger::debug("format " + std::to_string(modifiedCreateInfo.imageFormat));
-        // Diagnostic: makes the sRGB/UNORM aliasing trick visible in /tmp/gff.log.
+        // Diagnostic: makes the sRGB/UNORM aliasing trick visible in /tmp/lumen.log.
         // If a game negotiates a format convertToUNORM() doesn't handle (10-bit,
         // float HDR), unormFormat == format and the trick is a no-op — we can
         // grep this line to rule format-handling in or out when a look goes wrong.
@@ -1159,7 +1166,7 @@ namespace vkBasalt
             // profile's values into the registry + config overrides. Must
             // happen BEFORE the first frame paints so effects pick up the
             // correct values on their initial build.
-            gff::initializeForGame(&effectRegistry, pLogicalDevice->imguiOverlay.get());
+            lumen::initializeForGame(&effectRegistry, pLogicalDevice->imguiOverlay.get());
             pLogicalDevice->imguiOverlay->markDirty();
 
             // Initialize input blocking (grabs all input when overlay is visible)
@@ -1291,9 +1298,9 @@ namespace vkBasalt
             LogicalDevice* pDevice  = deviceMap[GetKey(queue)].get();
             ImGuiOverlay*  pOverlay = pDevice ? pDevice->imguiOverlay.get() : nullptr;
             if (edge == IPC_EDGE_CONNECT)
-                gff::applyActiveProfile(&effectRegistry, pOverlay);
+                lumen::applyActiveProfile(&effectRegistry, pOverlay);
             else
-                gff::applyNeutral(&effectRegistry, pOverlay);
+                lumen::applyNeutral(&effectRegistry, pOverlay);
         }
 
         // Check for Apply button press in overlay (overlay is at device level)
@@ -1580,7 +1587,7 @@ namespace vkBasalt
 
         if (pProperties)
         {
-            std::strcpy(pProperties->layerName, GFF_NAME);
+            std::strcpy(pProperties->layerName, LUMEN_NAME);
             std::strcpy(pProperties->description, "a post processing layer");
             pProperties->implementationVersion = 1;
             pProperties->specVersion           = VK_MAKE_VERSION(1, 2, 0);
@@ -1600,7 +1607,7 @@ namespace vkBasalt
                                                                       uint32_t*              pPropertyCount,
                                                                       VkExtensionProperties* pProperties)
     {
-        if (pLayerName == NULL || std::strcmp(pLayerName, GFF_NAME))
+        if (pLayerName == NULL || std::strcmp(pLayerName, LUMEN_NAME))
         {
             return VK_ERROR_LAYER_NOT_PRESENT;
         }
@@ -1619,7 +1626,7 @@ namespace vkBasalt
                                                                     VkExtensionProperties* pProperties)
     {
         // pass through any queries that aren't to us
-        if (pLayerName == NULL || std::strcmp(pLayerName, GFF_NAME))
+        if (pLayerName == NULL || std::strcmp(pLayerName, LUMEN_NAME))
         {
             if (physicalDevice == VK_NULL_HANDLE)
             {
@@ -1643,8 +1650,8 @@ namespace vkBasalt
 extern "C"
 { // these are the entry points for the layer, so they need to be c-linkeable
 
-    VK_BASALT_EXPORT PFN_vkVoidFunction VKAPI_CALL gff_GetDeviceProcAddr(VkDevice device, const char* pName);
-    VK_BASALT_EXPORT PFN_vkVoidFunction VKAPI_CALL gff_GetInstanceProcAddr(VkInstance instance, const char* pName);
+    VK_BASALT_EXPORT PFN_vkVoidFunction VKAPI_CALL lumen_GetDeviceProcAddr(VkDevice device, const char* pName);
+    VK_BASALT_EXPORT PFN_vkVoidFunction VKAPI_CALL lumen_GetInstanceProcAddr(VkInstance instance, const char* pName);
 
 #define GETPROCADDR(func) \
     if (!std::strcmp(pName, "vk" #func)) \
@@ -1658,7 +1665,7 @@ extern "C"
 #define INTERCEPT_CALLS \
     /* instance chain functions we intercept */ \
     if (!std::strcmp(pName, "vkGetInstanceProcAddr")) \
-        return (PFN_vkVoidFunction) &gff_GetInstanceProcAddr; \
+        return (PFN_vkVoidFunction) &lumen_GetInstanceProcAddr; \
     GETPROCADDR(EnumerateInstanceLayerProperties); \
     GETPROCADDR(EnumerateInstanceExtensionProperties); \
     GETPROCADDR(CreateInstance); \
@@ -1666,7 +1673,7 @@ extern "C"
 \
     /* device chain functions we intercept*/ \
     if (!std::strcmp(pName, "vkGetDeviceProcAddr")) \
-        return (PFN_vkVoidFunction) &gff_GetDeviceProcAddr; \
+        return (PFN_vkVoidFunction) &lumen_GetDeviceProcAddr; \
     GETPROCADDR(EnumerateDeviceLayerProperties); \
     GETPROCADDR(EnumerateDeviceExtensionProperties); \
     GETPROCADDR(CreateDevice); \
@@ -1683,7 +1690,7 @@ extern "C"
         GETPROCADDR(BindImageMemory); \
     }
 
-    VK_BASALT_EXPORT PFN_vkVoidFunction VKAPI_CALL gff_GetDeviceProcAddr(VkDevice device, const char* pName)
+    VK_BASALT_EXPORT PFN_vkVoidFunction VKAPI_CALL lumen_GetDeviceProcAddr(VkDevice device, const char* pName)
     {
         vkBasalt::initConfigs();
 
@@ -1695,7 +1702,7 @@ extern "C"
         }
     }
 
-    VK_BASALT_EXPORT PFN_vkVoidFunction VKAPI_CALL gff_GetInstanceProcAddr(VkInstance instance, const char* pName)
+    VK_BASALT_EXPORT PFN_vkVoidFunction VKAPI_CALL lumen_GetInstanceProcAddr(VkInstance instance, const char* pName)
     {
         vkBasalt::initConfigs();
 

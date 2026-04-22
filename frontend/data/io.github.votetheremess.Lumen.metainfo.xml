@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.votetheremess.Lumen</id>
+  <name>Lumen</name>
+  <summary>Live in-game color, contrast, and sharpening filters</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <developer id="io.github.votetheremess">
+    <name>votetheremess</name>
+  </developer>
+
+  <description>
+    <p>
+      Lumen is a Linux-native replacement for Nvidia's Freestyle / Game
+      Filters overlay. Press a hotkey in any Vulkan game and a live-slider
+      sidebar appears with Brightness, Contrast, Shadows, Highlights, Gamma,
+      Temperature, Vibrance, Sharpen, Clarity, HDR Toning, Bloom, Vignette,
+      and Black &amp; White — applied in real time without editing launch
+      options per-game.
+    </p>
+    <p>
+      Filters are stacked like Freestyle: start with nothing active, press
+      Add on the cards you want, reorder with Up/Down, remove with Remove.
+      Per-game profiles (three slots per game) save your sliders
+      automatically. A system-tray daemon keeps the controller alive in the
+      background.
+    </p>
+    <p>
+      Runs as an implicit Vulkan layer so every Vulkan application picks it
+      up automatically. Targets KDE Plasma on Wayland; Steam Proton games
+      load the layer via the Flathub Vulkan-layer extension mechanism.
+    </p>
+  </description>
+
+  <categories>
+    <category>Utility</category>
+    <category>Graphics</category>
+    <category>Game</category>
+  </categories>
+
+  <keywords>
+    <keyword>freestyle</keyword>
+    <keyword>reshade</keyword>
+    <keyword>vkbasalt</keyword>
+    <keyword>filter</keyword>
+    <keyword>vulkan</keyword>
+    <keyword>overlay</keyword>
+    <keyword>color grading</keyword>
+    <keyword>linux gaming</keyword>
+  </keywords>
+
+  <url type="homepage">https://github.com/votetheremess/Lumen</url>
+  <url type="bugtracker">https://github.com/votetheremess/Lumen/issues</url>
+  <url type="vcs-browser">https://github.com/votetheremess/Lumen</url>
+
+  <launchable type="desktop-id">io.github.votetheremess.Lumen.desktop</launchable>
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+
+  <!-- All attributes "none" for a filter-overlay utility: no user-generated
+       content, no in-app purchases, no social features, no violence depiction
+       (games themselves may contain anything; the overlay does not add to it). -->
+  <content_rating type="oars-1.1">
+    <content_attribute id="violence-cartoon">none</content_attribute>
+    <content_attribute id="violence-fantasy">none</content_attribute>
+    <content_attribute id="violence-realistic">none</content_attribute>
+    <content_attribute id="violence-bloodshed">none</content_attribute>
+    <content_attribute id="violence-sexual">none</content_attribute>
+    <content_attribute id="violence-desecration">none</content_attribute>
+    <content_attribute id="violence-slavery">none</content_attribute>
+    <content_attribute id="violence-worship">none</content_attribute>
+    <content_attribute id="drugs-alcohol">none</content_attribute>
+    <content_attribute id="drugs-narcotics">none</content_attribute>
+    <content_attribute id="drugs-tobacco">none</content_attribute>
+    <content_attribute id="sex-nudity">none</content_attribute>
+    <content_attribute id="sex-themes">none</content_attribute>
+    <content_attribute id="sex-homosexuality">none</content_attribute>
+    <content_attribute id="sex-prostitution">none</content_attribute>
+    <content_attribute id="sex-adultery">none</content_attribute>
+    <content_attribute id="sex-appearance">none</content_attribute>
+    <content_attribute id="language-profanity">none</content_attribute>
+    <content_attribute id="language-humor">none</content_attribute>
+    <content_attribute id="language-discrimination">none</content_attribute>
+    <content_attribute id="social-chat">none</content_attribute>
+    <content_attribute id="social-info">none</content_attribute>
+    <content_attribute id="social-audio">none</content_attribute>
+    <content_attribute id="social-location">none</content_attribute>
+    <content_attribute id="social-contacts">none</content_attribute>
+    <content_attribute id="money-purchasing">none</content_attribute>
+    <content_attribute id="money-gambling">none</content_attribute>
+  </content_rating>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/votetheremess/Lumen/main/docs/screenshots/overlay-ingame.png</image>
+      <caption>In-game sidebar with live filter sliders, open over a Vulkan title</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/votetheremess/Lumen/main/docs/screenshots/frontend-window.png</image>
+      <caption>Tray daemon and the GTK4 settings window</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/votetheremess/Lumen/main/docs/screenshots/filter-add.png</image>
+      <caption>Freestyle-style filter stack — add, reorder, and remove cards</caption>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="0.2.0" date="2026-04-21">
+      <description>
+        <p>Rebrand to Lumen. Full rename from the GameFiltersFlatpak development
+        codename. Four-effect filter chain (`lumen_local`, `lumen_tonal`,
+        `lumen_color`, `lumen_stylistic`) with Freestyle-style add/remove/reorder
+        UX. Flatpak packaging ready for Flathub submission.</p>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-04-16">
+      <description>
+        <p>Initial development release. Scaffolding only; not yet functional.</p>
+      </description>
+    </release>
+  </releases>
+</component>

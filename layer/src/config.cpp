@@ -9,23 +9,23 @@ namespace vkBasalt
 {
     Config::Config()
     {
-        // Find the active GameFiltersFlatpak profile. The frontend writes
-        // $XDG_CONFIG_HOME/game-filters-flatpak/active.conf when the user
+        // Find the active Lumen profile. The frontend writes
+        // $XDG_CONFIG_HOME/lumen/active.conf when the user
         // switches profile; the layer watches that path for changes.
         const char* tmpHomeEnv     = std::getenv("XDG_DATA_HOME");
-        std::string userConfigFile = tmpHomeEnv ? std::string(tmpHomeEnv) + "/game-filters-flatpak/game-filters-flatpak.conf"
-                                                : std::string(std::getenv("HOME")) + "/.local/share/game-filters-flatpak/game-filters-flatpak.conf";
+        std::string userConfigFile = tmpHomeEnv ? std::string(tmpHomeEnv) + "/lumen/lumen.conf"
+                                                : std::string(std::getenv("HOME")) + "/.local/share/lumen/lumen.conf";
 
         const char* tmpConfigEnv      = std::getenv("XDG_CONFIG_HOME");
-        std::string userXdgConfigFile = tmpConfigEnv ? std::string(tmpConfigEnv) + "/game-filters-flatpak/active.conf"
-                                                     : std::string(std::getenv("HOME")) + "/.config/game-filters-flatpak/active.conf";
+        std::string userXdgConfigFile = tmpConfigEnv ? std::string(tmpConfigEnv) + "/lumen/active.conf"
+                                                     : std::string(std::getenv("HOME")) + "/.config/lumen/active.conf";
 
         const std::array<std::string, 5> configPaths = {
             userXdgConfigFile,                                                                // frontend-managed active profile
             userConfigFile,                                                                   // user-wide fallback
-            std::string(SYSCONFDIR) + "/game-filters-flatpak.conf",                         // system-wide
-            std::string(SYSCONFDIR) + "/game-filters-flatpak/game-filters-flatpak.conf",  // system-wide alt
-            std::string(DATADIR) + "/game-filters-flatpak/game-filters-flatpak.conf",     // packaged default (shipped with layer)
+            std::string(SYSCONFDIR) + "/lumen.conf",                         // system-wide
+            std::string(SYSCONFDIR) + "/lumen/lumen.conf",  // system-wide alt
+            std::string(DATADIR) + "/lumen/lumen.conf",     // packaged default (shipped with layer)
         };
 
         for (const auto& path : configPaths)
@@ -41,7 +41,7 @@ namespace vkBasalt
             }
         }
 
-        Logger::err("no game-filters-flatpak.conf found");
+        Logger::err("no lumen.conf found");
     }
 
     Config::Config(const std::string& path)

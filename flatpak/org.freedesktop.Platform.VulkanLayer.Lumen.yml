@@ -1,0 +1,44 @@
+# Vulkan layer extension for Lumen.
+# App-id follows the Flathub `org.freedesktop.Platform.VulkanLayer.*`
+# convention; Steam's Flatpak auto-discovers layers installed under this
+# extension point (via /usr/lib/extensions/vulkan/<name>/share/vulkan/
+# implicit_layer.d/).
+#
+# Precedent / reference: flathub/org.freedesktop.Platform.VulkanLayer.vkBasalt.
+app-id: org.freedesktop.Platform.VulkanLayer.Lumen
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+build-extension: true
+separate-locales: false
+appstream-compose: false
+build-options:
+  prefix: /usr/lib/extensions/vulkan/Lumen
+  prepend-path: /usr/lib/sdk/rust-stable/bin
+  prepend-pkg-config-path: /usr/lib/pkgconfig
+  env:
+    PATH: /app/bin:/usr/bin:/usr/lib/sdk/rust-stable/bin
+modules:
+  - name: lumen-layer
+    buildsystem: meson
+    subdir: layer
+    config-opts:
+      - --libdir=lib
+      - --buildtype=release
+    sources:
+      - type: dir
+        path: ..
+  # 32-bit variant for 32-bit Wine/Proton games. Mirrors vkBasalt's Flathub
+  # pair — same sources, compiled against the i386 SDK extension, installed
+  # into /usr/lib/extensions/vulkan/Lumen/lib/i386-linux-gnu/ so the 32-bit
+  # Vulkan loader inside Proton's 32-bit path picks it up.
+  - name: lumen-layer-32bit
+    buildsystem: meson
+    subdir: layer
+    config-opts:
+      - --libdir=lib/i386-linux-gnu
+      - --buildtype=release
+      - --cross-file=/usr/lib/sdk/toolchain-i386/meson-cross-file.txt
+    sources:
+      - type: dir
+        path: ..

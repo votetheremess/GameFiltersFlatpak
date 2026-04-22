@@ -1,5 +1,5 @@
-#ifndef GFF_OVERLAY_THEME_HPP_INCLUDED
-#define GFF_OVERLAY_THEME_HPP_INCLUDED
+#ifndef LUMEN_OVERLAY_THEME_HPP_INCLUDED
+#define LUMEN_OVERLAY_THEME_HPP_INCLUDED
 
 struct ImFont;
 
@@ -7,7 +7,7 @@ struct ImFont;
 // accents. Applied once during overlay setup in place of the default
 // vkBasalt_overlay styling.
 
-namespace gff
+namespace lumen
 {
     // Load project fonts into the current ImGui context's atlas. Must be
     // called AFTER ImGui::CreateContext() and BEFORE ImGui_ImplVulkan_Init()
@@ -25,4 +25,4 @@ namespace gff
     void applyOverlayTheme();
 }
 
-#endif // GFF_OVERLAY_THEME_HPP_INCLUDED
+#endif // LUMEN_OVERLAY_THEME_HPP_INCLUDED

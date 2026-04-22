@@ -10,7 +10,7 @@ use crate::messages::FrontendCommand;
 /// shortcuts; on GNOME it falls back to nothing (unsupported portal).
 pub fn register_hotkey(ipc: Client) {
     std::thread::Builder::new()
-        .name("gff-portal".to_owned())
+        .name("lumen-portal".to_owned())
         .spawn(move || {
             log::info!("portal: thread started");
             let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
@@ -55,7 +55,7 @@ async fn run(ipc: Client) -> ashpd::Result<()> {
 
     if !already_bound {
         log::info!("portal: binding new shortcut toggle-overlay (Ctrl+Alt+F)");
-        let shortcut = NewShortcut::new("toggle-overlay", "Toggle Game Filters overlay")
+        let shortcut = NewShortcut::new("toggle-overlay", "Toggle Lumen overlay")
             .preferred_trigger(Some("CTRL+ALT+f"));
         let parent = WindowIdentifier::default();
         portal.bind_shortcuts(&session, &[shortcut], &parent).await?.response()?;

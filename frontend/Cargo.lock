@@ -630,24 +630,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "game-filters-flatpak"
-version = "0.1.0"
-dependencies = [
- "ashpd",
- "env_logger",
- "futures-util",
- "gtk4",
- "ksni",
- "libadwaita",
- "libc",
- "log",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
-]
-
-[[package]]
 name = "gdk-pixbuf"
 version = "0.20.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1258,6 +1240,24 @@ name = "log"
 version = "0.4.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
+
+[[package]]
+name = "lumen"
+version = "0.1.0"
+dependencies = [
+ "ashpd",
+ "env_logger",
+ "futures-util",
+ "gtk4",
+ "ksni",
+ "libadwaita",
+ "libc",
+ "log",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
 
 [[package]]
 name = "memchr"

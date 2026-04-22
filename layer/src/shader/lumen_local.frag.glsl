@@ -1,4 +1,4 @@
-// GameFiltersFlatpak — local / spatial filter pass.
+// Lumen — local / spatial filter pass.
 // Implements the four filters that sample neighbor pixels: Sharpen,
 // Clarity, HDR Toning, Bloom.
 //
@@ -8,7 +8,7 @@
 //   - https://reshade.me/forum/shader-suggestions/7664-can-someone-port-details-yfx-from-freestyle-to-reshade
 //
 // Color space: gamma-encoded sRGB (UNORM image views are forced in
-// effect_gff_local.cpp so the hardware sampler never auto-linearizes
+// effect_lumen_local.cpp so the hardware sampler never auto-linearizes
 // or re-encodes). Rec.601 luma weights match Freestyle's reference.
 // Slider ranges follow Nvidia's public scale — bipolar ±100 or unipolar
 // 0..100 — so Windows preset values paste in directly.

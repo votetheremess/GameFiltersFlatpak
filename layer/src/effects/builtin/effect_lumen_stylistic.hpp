@@ -1,5 +1,5 @@
-#ifndef EFFECT_GFF_STYLISTIC_HPP_INCLUDED
-#define EFFECT_GFF_STYLISTIC_HPP_INCLUDED
+#ifndef EFFECT_LUMEN_STYLISTIC_HPP_INCLUDED
+#define EFFECT_LUMEN_STYLISTIC_HPP_INCLUDED
 
 #include <vector>
 
@@ -10,19 +10,19 @@
 
 namespace vkBasalt
 {
-    // Stylistic / mood pass of the GameFiltersFlatpak chain — Black & White
+    // Stylistic / mood pass of the Lumen chain — Black & White
     // desaturation and radial Vignette.
-    class GffStylisticEffect : public SimpleEffect
+    class LumenStylisticEffect : public SimpleEffect
     {
     public:
-        GffStylisticEffect(LogicalDevice*       pLogicalDevice,
+        LumenStylisticEffect(LogicalDevice*       pLogicalDevice,
                            VkFormat             format,
                            VkExtent2D           imageExtent,
                            std::vector<VkImage> inputImages,
                            std::vector<VkImage> outputImages,
                            Config*              pConfig);
-        ~GffStylisticEffect();
+        ~LumenStylisticEffect();
     };
 } // namespace vkBasalt
 
-#endif // EFFECT_GFF_STYLISTIC_HPP_INCLUDED
+#endif // EFFECT_LUMEN_STYLISTIC_HPP_INCLUDED

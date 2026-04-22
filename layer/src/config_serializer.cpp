@@ -14,17 +14,17 @@ namespace vkBasalt
     std::string ConfigSerializer::getBaseConfigDir()
     {
         // Must match profile_manager's config dir so layer settings + per-game
-        // profiles live under one app-id'd root (~/.config/game-filters-flatpak).
+        // profiles live under one app-id'd root (~/.config/lumen).
         // The old upstream path (vkBasalt-overlay/) is abandoned: not migrated
         // because any existing file is from pre-rename dev sessions and carries
         // stale values (notably overlayBlockInput=false that bricked input grab).
         const char* xdgConfig = std::getenv("XDG_CONFIG_HOME");
         if (xdgConfig)
-            return std::string(xdgConfig) + "/game-filters-flatpak";
+            return std::string(xdgConfig) + "/lumen";
 
         const char* home = std::getenv("HOME");
         if (home)
-            return std::string(home) + "/.config/game-filters-flatpak";
+            return std::string(home) + "/.config/lumen";
 
         return "";
     }
@@ -185,7 +185,7 @@ namespace vkBasalt
     {
         const char* home = std::getenv("HOME");
         if (home)
-            return std::string(home) + "/.config/game-filters-flatpak/default_config";
+            return std::string(home) + "/.config/lumen/default_config";
         return "";
     }
 

@@ -1,10 +1,11 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
 
 use adw::glib;
 use adw::prelude::*;
 
+use crate::games::{self, GamesState};
 use crate::ipc::Client;
 use crate::messages::FrontendCommand;
 use crate::tray::{self, TrayCommand};
@@ -14,7 +15,7 @@ pub fn wire(app: &adw::Application) {
     let setup_done = Rc::new(Cell::new(false));
 
     app.connect_startup(|_app| {
-        log::info!("game-filters-flatpak startup");
+        log::info!("lumen startup");
         // Lock to dark the libadwaita-approved way. Setting the GTK4-era
         // `gtk-application-prefer-dark-theme` on GtkSettings emits a
         // deprecation warning and doesn't fully apply the Adwaita palette
@@ -32,10 +33,21 @@ pub fn wire(app: &adw::Application) {
                 return;
             }
 
+            // Load games state from ~/.config/lumen/games.json (first-run
+            // seeds it with defaults + an immediate scan of known Steam
+            // paths). Shared between the window (UI state) and the IPC
+            // client (broadcasts enabled-game changes to layers).
+            let games_state: Rc<RefCell<GamesState>> =
+                Rc::new(RefCell::new(games::load_or_init()));
+
             let ipc_client = Client::spawn();
+            // Prime the IPC cache so the first layer connect sees the
+            // real enabled list, not an empty snapshot.
+            ipc_client.update_enabled_games(games_state.borrow().enabled_ids());
+
             portal::register_hotkey(ipc_client.clone());
 
-            let win = window::build(app, ipc_client.clone());
+            let win = window::build(app, ipc_client.clone(), games_state.clone());
 
             // Hide on close, keep the daemon (tray + IPC + portal hotkey)
             // running in the background. Explicit Quit is via the tray menu.

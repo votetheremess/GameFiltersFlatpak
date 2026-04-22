@@ -2,16 +2,16 @@
 
 Two separately-packaged Flatpak artifacts that communicate over Unix sockets. The Vulkan layer runs inside every Vulkan app on the system; the frontend runs once, as a user-session daemon with a tray icon.
 
-## Vulkan Layer — `com.gamefiltersflatpak.VulkanLayer`
+## Vulkan Layer — `org.freedesktop.Platform.VulkanLayer.Lumen`
 
-C++, Meson. Forked from [vkBasalt_overlay](https://github.com/Boux/vkBasalt_overlay), which itself descends from vkBasalt. We inherit the Vulkan hooking, ImGui integration, effect registry, shader pipeline, and ReShade FX compiler. We own the visual design, theme, layered sidebar UI, branding, implicit-layer loader model, per-game profile system, IPC client, abstract-socket support, font loader, and the four chained GFF effects (`gff_local`, `gff_tonal`, `gff_color`, `gff_stylistic`). Upstream Zlib notice preserved at `layer/LICENSE-UPSTREAM`.
+C++, Meson. Forked from [vkBasalt_overlay](https://github.com/Boux/vkBasalt_overlay), which itself descends from vkBasalt. We inherit the Vulkan hooking, ImGui integration, effect registry, shader pipeline, and ReShade FX compiler. We own the visual design, theme, layered sidebar UI, branding, implicit-layer loader model, per-game profile system, IPC client, abstract-socket support, font loader, and the four chained Lumen effects (`lumen_local`, `lumen_tonal`, `lumen_color`, `lumen_stylistic`). Upstream Zlib notice preserved at `layer/LICENSE-UPSTREAM`.
 
 Installed as an **implicit** Vulkan layer — the Vulkan loader auto-loads it into every Vulkan application on the system, the same mechanism `VK_LAYER_MESA_device_select` uses. No per-game `ENABLE_VK*=1` launch options required. This is the single most important UX differentiator vs existing Linux post-processing tools (vkBasalt, vkPost, upstream vkBasalt_overlay all ship as explicit layers).
 
 Being implicit means we're loaded into processes that are not games: KWin, GTK/Qt apps, Wine helpers. Two gates decide whether a given process gets the full layer or a zero-cost pass-through:
 
-1. **`gff::isGameProcess()`** — true iff `argv[0]` ends in `.exe`/`.EXE`, or one of `SteamAppId` / `SteamGameId` / `STEAM_COMPAT_DATA_PATH` is in the environment. Cached per-process.
-2. **`gff::frontendAvailable()`** — probes the IPC socket (filesystem path + abstract namespace); result cached 500 ms so swapchain-create bursts don't storm the frontend.
+1. **`lumen::isGameProcess()`** — true iff `argv[0]` ends in `.exe`/`.EXE`, or one of `SteamAppId` / `SteamGameId` / `STEAM_COMPAT_DATA_PATH` is in the environment. Cached per-process.
+2. **`lumen::frontendAvailable()`** — probes the IPC socket (filesystem path + abstract namespace); result cached 500 ms so swapchain-create bursts don't storm the frontend.
 
 Both gates apply at `vkBasalt_CreateSwapchainKHR`. When either is false, the swapchain is marked `bypassLayer = true` and every hook (`GetSwapchainImagesKHR`, `QueuePresentKHR`, `DestroySwapchainKHR`) checks the flag at the top and forwards to the driver untouched. The persistent IPC connection is also gated on `isGameProcess()`, so non-game processes never open a socket.
 
@@ -21,7 +21,7 @@ Every `VkResult` that `vkBasalt_QueuePresentKHR` returns to a Wine/Proton caller
 
 ### Overlay and input blocking
 
-In-game UI is a left-edge full-height sidebar, position-locked (`ImGuiWindowFlags_NoMove`, pinned to `viewport->WorkPos`). A three-slot profile selector at the top, then a Freestyle-style filter stack: users start with no filters active, add cards with `Add`, reorder with `Up`/`Down`, and remove with `Remove`. Four canonical cards map to the four GFF effects (Brightness/Contrast → `gff_tonal`, Color → `gff_color`, Details → `gff_local`, Effects → `gff_stylistic`). Sliders are live — changes flow through the registry into spec-constant rebakes on the next frame. When the overlay is open, XInput2 `XIGrabDevice` grabs every master and attached-slave pointer/keyboard so the game doesn't see mouse motion or keystrokes. `XIGrabDevice` covers both core X events and `XI_RawMotion`, which Wine/DXVK titles read for mouse input and which the legacy `XGrabPointer` doesn't catch.
+In-game UI is a left-edge full-height sidebar, position-locked (`ImGuiWindowFlags_NoMove`, pinned to `viewport->WorkPos`). A three-slot profile selector at the top, then a Freestyle-style filter stack: users start with no filters active, add cards with `Add`, reorder with `Up`/`Down`, and remove with `Remove`. Four canonical cards map to the four Lumen effects (Brightness/Contrast → `lumen_tonal`, Color → `lumen_color`, Details → `lumen_local`, Effects → `lumen_stylistic`). Sliders are live — changes flow through the registry into spec-constant rebakes on the next frame. When the overlay is open, XInput2 `XIGrabDevice` grabs every master and attached-slave pointer/keyboard so the game doesn't see mouse motion or keystrokes. `XIGrabDevice` covers both core X events and `XI_RawMotion`, which Wine/DXVK titles read for mouse input and which the legacy `XGrabPointer` doesn't catch.
 
 ### Filter pipeline
 
@@ -29,12 +29,12 @@ Four chained fragment-shader passes, each its own `SimpleEffect` subclass with i
 
 | Effect | Shader | Sliders |
 |---|---|---|
-| `gff_local` | `gff_local.frag.glsl` | Sharpen, Clarity, HDR Toning, Bloom |
-| `gff_tonal` | `gff_tonal.frag.glsl` | Exposure, Contrast, Highlights, Shadows, Gamma |
-| `gff_color` | `gff_color.frag.glsl` | Tint Color, Tint Intensity, Temperature, Vibrance |
-| `gff_stylistic` | `gff_stylistic.frag.glsl` | Vignette, Black & White |
+| `lumen_local` | `lumen_local.frag.glsl` | Sharpen, Clarity, HDR Toning, Bloom |
+| `lumen_tonal` | `lumen_tonal.frag.glsl` | Exposure, Contrast, Highlights, Shadows, Gamma |
+| `lumen_color` | `lumen_color.frag.glsl` | Tint Color, Tint Intensity, Temperature, Vibrance |
+| `lumen_stylistic` | `lumen_stylistic.frag.glsl` | Vignette, Black & White |
 
-Sliders follow Nvidia's public scale (bipolar ±100, unipolar 0–100, hue 0–360) so Windows preset values paste in directly. Each shader normalizes internally. Every GFF effect pins its image views to the UNORM alias of the swapchain format via `VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT`, so the hardware sampler neither auto-linearizes on read nor re-encodes on write. Rec.601 luma matches Freestyle's reference against gamma-encoded signal.
+Sliders follow Nvidia's public scale (bipolar ±100, unipolar 0–100, hue 0–360) so Windows preset values paste in directly. Each shader normalizes internally. Every Lumen effect pins its image views to the UNORM alias of the swapchain format via `VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT`, so the hardware sampler neither auto-linearizes on read nor re-encodes on write. Rec.601 luma matches Freestyle's reference against gamma-encoded signal.
 
 Intermediate render targets between passes are 8-bit UNORM (matching Freestyle). If gradient content ever reveals cumulative quantization banding, the `SimpleEffect::init(..., viewFormat)` override already supports bumping intermediates to 16-bit at the cost of extra VRAM.
 
@@ -46,13 +46,13 @@ Sign conventions (empirical, from YouTube Freestyle reference):
 - `+highlights` → RECOVERY / darken brights (Lightroom convention)
 - `+gamma` → brighter midtones (Nvidia and Lightroom agree)
 
-See the four `gff_*.frag.glsl` shaders for full parameter lists and math.
+See the four `lumen_*.frag.glsl` shaders for full parameter lists and math.
 
-## Frontend — `com.gamefiltersflatpak.App`
+## Frontend — `io.github.votetheremess.Lumen`
 
 Rust + gtk4-rs + libadwaita-rs. Tray via `ksni` (StatusNotifierItem). Global hotkey via the XDG GlobalShortcuts portal (`ashpd`). Per-game profile management. IPC **server**.
 
-The frontend sets `GFF_DISABLE=1` in its own process environment at the top of `main.rs`, *before* any GTK/Adw initialization — otherwise GTK4's internal Vulkan rendering loads our layer inside the frontend process, and that in-process instance wins socket contention, swallowing every command meant for the game.
+The frontend sets `LUMEN_DISABLE=1` in its own process environment at the top of `main.rs`, *before* any GTK/Adw initialization — otherwise GTK4's internal Vulkan rendering loads our layer inside the frontend process, and that in-process instance wins socket contention, swallowing every command meant for the game.
 
 Window close semantics:
 
@@ -66,8 +66,8 @@ Window close semantics:
 
 Listens on two sockets simultaneously:
 
-- Filesystem: `$XDG_RUNTIME_DIR/game-filters-flatpak.sock`
-- Abstract: `@game-filters-flatpak.sock`
+- Filesystem: `$XDG_RUNTIME_DIR/lumen.sock`
+- Abstract: `@lumen.sock`
 
 The abstract socket is how layers inside Steam's pressure-vessel sandbox reach the frontend — the filesystem path is isolated in that namespace.
 
@@ -75,11 +75,11 @@ Framing is length-prefixed little-endian JSON, capped at 64 KiB per message. See
 
 ### Frontend-availability gating
 
-Closing the frontend disables filters. The layer's persistent `IpcClient` fires a `ConnectionHandler` on every connect/disconnect edge; the present thread consumes the event and calls `gff::applyActiveProfile()` or `gff::applyNeutral()` accordingly. Both mark the overlay dirty, so spec constants rebake on the next frame. Launching a game with the frontend closed yields neutral pass-through; relaunching the frontend mid-game re-applies the active profile within a frame.
+Closing the frontend disables filters. The layer's persistent `IpcClient` fires a `ConnectionHandler` on every connect/disconnect edge; the present thread consumes the event and calls `lumen::applyActiveProfile()` or `lumen::applyNeutral()` accordingly. Both mark the overlay dirty, so spec constants rebake on the next frame. Launching a game with the frontend closed yields neutral pass-through; relaunching the frontend mid-game re-applies the active profile within a frame.
 
 ## Per-game profiles
 
-State under `~/.config/game-filters-flatpak/games/<exe>/`:
+State under `~/.config/lumen/games/<exe>/`:
 
 - `profile1.conf`, `profile2.conf`, `profile3.conf` — three slots, auto-created on first launch
 - `active.txt` — integer 1-3 identifying the selected slot

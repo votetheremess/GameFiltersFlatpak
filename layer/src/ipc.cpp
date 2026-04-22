@@ -12,7 +12,7 @@
 
 #include "logger.hpp"
 
-namespace gff
+namespace lumen
 {
     namespace
     {
@@ -208,4 +208,4 @@ namespace gff
                 m_handler(cmd);
         }
     }
-} // namespace gff
+} // namespace lumen

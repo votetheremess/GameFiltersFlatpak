@@ -9,6 +9,7 @@
 #include <fstream>
 #include <map>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -26,7 +27,7 @@
 #include "ipc.hpp"
 #include "logger.hpp"
 
-namespace gff
+namespace lumen
 {
     namespace fs = std::filesystem;
 
@@ -44,42 +45,42 @@ namespace gff
         {
             static const std::vector<CardDef> list = {
                 {
-                    "gff_tonal",
+                    "lumen_tonal",
                     "Brightness / Contrast",
                     {
-                        {"gff.exposure",   "Exposure",   "%.0f"},
-                        {"gff.contrast",   "Contrast",   "%.0f"},
-                        {"gff.highlights", "Highlights", "%.0f"},
-                        {"gff.shadows",    "Shadows",    "%.0f"},
-                        {"gff.gamma",      "Gamma",      "%.0f"},
+                        {"lumen.exposure",   "Exposure",   "%.0f"},
+                        {"lumen.contrast",   "Contrast",   "%.0f"},
+                        {"lumen.highlights", "Highlights", "%.0f"},
+                        {"lumen.shadows",    "Shadows",    "%.0f"},
+                        {"lumen.gamma",      "Gamma",      "%.0f"},
                     },
                 },
                 {
-                    "gff_color",
+                    "lumen_color",
                     "Color",
                     {
-                        {"gff.tintColor",     "Tint Color",     "%.0f\xc2\xb0"},
-                        {"gff.tintIntensity", "Tint Intensity", "%.0f"},
-                        {"gff.temperature",   "Temperature",    "%.0f"},
-                        {"gff.vibrance",      "Vibrance",       "%.0f"},
+                        {"lumen.tintColor",     "Tint Color",     "%.0f\xc2\xb0"},
+                        {"lumen.tintIntensity", "Tint Intensity", "%.0f"},
+                        {"lumen.temperature",   "Temperature",    "%.0f"},
+                        {"lumen.vibrance",      "Vibrance",       "%.0f"},
                     },
                 },
                 {
-                    "gff_local",
+                    "lumen_local",
                     "Details",
                     {
-                        {"gff.sharpen",   "Sharpen",    "%.0f"},
-                        {"gff.clarity",   "Clarity",    "%.0f"},
-                        {"gff.hdrToning", "HDR Toning", "%.0f"},
-                        {"gff.bloom",     "Bloom",      "%.0f"},
+                        {"lumen.sharpen",   "Sharpen",    "%.0f"},
+                        {"lumen.clarity",   "Clarity",    "%.0f"},
+                        {"lumen.hdrToning", "HDR Toning", "%.0f"},
+                        {"lumen.bloom",     "Bloom",      "%.0f"},
                     },
                 },
                 {
-                    "gff_stylistic",
+                    "lumen_stylistic",
                     "Effects",
                     {
-                        {"gff.vignette",    "Vignette",      "%.0f"},
-                        {"gff.bwIntensity", "Black & White", "%.0f"},
+                        {"lumen.vignette",    "Vignette",      "%.0f"},
+                        {"lumen.bwIntensity", "Black & White", "%.0f"},
                     },
                 },
             };
@@ -88,7 +89,7 @@ namespace gff
 
         // Reject names that would escape gameDir() or alias it. argv[0]
         // is attacker-influenceable (a launcher can spoof it), and the
-        // result is concatenated into ~/.config/game-filters-flatpak/games/<name>/ — so
+        // result is concatenated into ~/.config/lumen/games/<name>/ — so
         // `..`, `.`, empty, or anything containing a path separator
         // would break confinement.
         bool isSafeGameName(const std::string& s)
@@ -135,11 +136,11 @@ namespace gff
         {
             const char* xdg = std::getenv("XDG_CONFIG_HOME");
             if (xdg && *xdg)
-                return fs::path(xdg) / "game-filters-flatpak";
+                return fs::path(xdg) / "lumen";
             const char* home = std::getenv("HOME");
             if (home && *home)
-                return fs::path(home) / ".config" / "game-filters-flatpak";
-            return fs::path("/tmp") / "game-filters-flatpak";
+                return fs::path(home) / ".config" / "lumen";
+            return fs::path("/tmp") / "lumen";
         }
 
         fs::path gameDir(const std::string& gameName)
@@ -194,16 +195,21 @@ namespace gff
 
         // Parse a colon-separated `effects = a:b:c` value into a vector.
         // Whitespace around each entry is trimmed; empty entries are
-        // skipped. Legacy single-name `gff_pipeline` is migrated to the
-        // four-effect default chain so users with pre-split profiles keep
-        // their slider values applied on upgrade.
+        // skipped.
+        //
+        // Two legacy-rename cases are migrated silently to preserve user
+        // profiles across the GameFiltersFlatpak → Lumen transition:
+        //   1. Single-name `gff_pipeline` (the v1 pre-split combined effect) →
+        //      the four-effect Lumen chain.
+        //   2. Individual `gff_{local,tonal,color,stylistic}` entries (the
+        //      post-split GameFiltersFlatpak chain) → their `lumen_*` equivalents.
         std::vector<std::string> parseChain(const std::string& raw, bool& outMigrated)
         {
             outMigrated = false;
             if (raw == "gff_pipeline")
             {
                 outMigrated = true;
-                return {"gff_local", "gff_tonal", "gff_color", "gff_stylistic"};
+                return {"lumen_local", "lumen_tonal", "lumen_color", "lumen_stylistic"};
             }
             std::vector<std::string> result;
             std::stringstream ss(raw);
@@ -214,7 +220,17 @@ namespace gff
                 auto r = item.find_last_not_of(" \t");
                 if (l == std::string::npos)
                     continue;
-                result.push_back(item.substr(l, r - l + 1));
+                std::string name = item.substr(l, r - l + 1);
+                // Per-entry legacy migration: GameFiltersFlatpak-era effect
+                // names had a `gff_` prefix. Rewrite to the Lumen-era `lumen_`
+                // prefix so the chain still resolves to registered effects
+                // after the rename.
+                if (name.rfind("gff_", 0) == 0)
+                {
+                    name = "lumen_" + name.substr(4);
+                    outMigrated = true;
+                }
+                result.push_back(name);
             }
             return result;
         }
@@ -246,7 +262,7 @@ namespace gff
                 vkBasalt::Logger::warn("profile: cannot write " + path.string());
                 return;
             }
-            out << "# GameFiltersFlatpak profile\n";
+            out << "# Lumen profile\n";
             out << "effects = " << joinChain(reg->getSelectedEffects()) << "\n";
             for (const auto& card : cardList())
             {
@@ -276,7 +292,7 @@ namespace gff
                 vkBasalt::Logger::warn("profile: cannot write " + path.string());
                 return;
             }
-            out << "# GameFiltersFlatpak profile\n";
+            out << "# Lumen profile\n";
             out << "effects = \n";
             for (const auto& card : cardList())
                 for (const auto& s : card.sliders)
@@ -305,7 +321,8 @@ namespace gff
         // reflects them) and the Config override map (so the next effect
         // rebuild reads the right numbers). Also applies the chain order
         // from the `effects` key, with legacy-migration for profiles that
-        // still say `effects = gff_pipeline`.
+        // still use the `gff_pipeline` / `gff_*` / `gff.*` GameFiltersFlatpak-
+        // era naming.
         //
         // Returns true if legacy migration was performed — the caller
         // should follow up with writeProfileFile(path, reg) to persist
@@ -332,18 +349,31 @@ namespace gff
             // Mirrors the pattern in initializeSelectedEffectsFromConfig.
             for (const auto& name : chain)
                 reg->ensureEffect(name);
-            if (migrated)
-                vkBasalt::Logger::info("profile: migrating legacy gff_pipeline -> split chain");
 
             // Per-card slider values. Written for every card regardless of
             // whether the card is currently active, so re-adding a removed
-            // card restores its last-known values.
+            // card restores its last-known values. Falls back to the legacy
+            // `gff.*` slider key if the current `lumen.*` key isn't found —
+            // this is how GameFiltersFlatpak-era profiles keep their slider
+            // values across the Lumen rename.
             for (const auto& card : cardList())
             {
                 for (const auto& s : card.sliders)
                 {
                     float value = 0.0f;
                     auto it = vals.find(s.key);
+                    if (it == vals.end())
+                    {
+                        // Legacy `gff.<suffix>` fallback for the `lumen.<suffix>` key.
+                        std::string legacyKey = s.key;
+                        if (legacyKey.rfind("lumen.", 0) == 0)
+                        {
+                            legacyKey = "gff." + legacyKey.substr(std::strlen("lumen."));
+                            it = vals.find(legacyKey);
+                            if (it != vals.end())
+                                migrated = true;
+                        }
+                    }
                     if (it != vals.end())
                     {
                         std::stringstream ss(it->second);
@@ -368,6 +398,8 @@ namespace gff
                         cfg->setOverride(s.key, vkBasalt::floatToString(value));
                 }
             }
+            if (migrated)
+                vkBasalt::Logger::info("profile: migrating legacy GameFiltersFlatpak state -> Lumen");
             return migrated;
         }
 
@@ -461,6 +493,136 @@ namespace gff
         return result;
     }
 
+    // --- Enabled-games cache (populated by IPC) -------------------------
+    //
+    // The frontend broadcasts a `games-enabled-update` message on every
+    // client connect and on every toggle change. We store the two id
+    // classes separately so the lookup path in isGameEnabled() is O(log n)
+    // on each (typically tens of entries max). Guarded by a std::mutex so
+    // the IPC thread's writes race-free with the Vulkan thread's reads
+    // inside vkCreateSwapchainKHR.
+    namespace
+    {
+        std::mutex            g_enabledMutex;
+        std::set<std::string> g_enabledSteamApps;
+        std::set<std::string> g_enabledExeBasenames;
+
+        // Basename of the first NUL-terminated token of /proc/self/cmdline.
+        // Used for exe-path matching; we match on basename (not full path)
+        // because Wine/Proton rewrites argv[0] into a Windows-style path
+        // like `Z:\games\foo.exe` that won't match the Linux source path
+        // the user picked in the scanner. Basenames are stable across
+        // that rewrite.
+        std::string currentExeBasename()
+        {
+            std::ifstream cmdline("/proc/self/cmdline");
+            if (!cmdline.good())
+                return {};
+            std::string content((std::istreambuf_iterator<char>(cmdline)),
+                                std::istreambuf_iterator<char>());
+            size_t nul = content.find('\0');
+            if (nul != std::string::npos)
+                content.resize(nul);
+            // Split on both / and \ so Linux and Windows-style paths both
+            // yield the right basename.
+            size_t slash = content.find_last_of("/\\");
+            if (slash == std::string::npos)
+                return content;
+            return content.substr(slash + 1);
+        }
+
+        std::string pathBasename(const std::string& p)
+        {
+            size_t slash = p.find_last_of("/\\");
+            return (slash == std::string::npos) ? p : p.substr(slash + 1);
+        }
+
+        // Pull a string value out of a JSON fragment by key. Minimal — no
+        // escape handling beyond what the frontend actually emits (serde's
+        // default string serialization). Sufficient for kind / value extraction.
+        std::string extractJsonString(const std::string& obj, const std::string& key)
+        {
+            std::string needle = "\"" + key + "\"";
+            size_t k = obj.find(needle);
+            if (k == std::string::npos)
+                return {};
+            k = obj.find(':', k + needle.size());
+            if (k == std::string::npos)
+                return {};
+            k = obj.find('"', k);
+            if (k == std::string::npos)
+                return {};
+            size_t end = obj.find('"', k + 1);
+            if (end == std::string::npos)
+                return {};
+            return obj.substr(k + 1, end - k - 1);
+        }
+    } // namespace
+
+    void applyEnabledGamesJson(const std::string& rawJson)
+    {
+        // Shape we're parsing:
+        //   {"type":"games-enabled-update","enabled":[{"kind":"SteamApp","value":"..."},{"kind":"Executable","value":"/..."}]}
+        std::set<std::string> steamApps;
+        std::set<std::string> exeBasenames;
+
+        size_t pos = rawJson.find("\"enabled\"");
+        if (pos == std::string::npos)
+        {
+            // No enabled list; treat as empty (everything off).
+        }
+        else
+        {
+            size_t arrStart = rawJson.find('[', pos);
+            size_t arrEnd   = (arrStart == std::string::npos) ? std::string::npos
+                                                              : rawJson.find(']', arrStart);
+            if (arrStart != std::string::npos && arrEnd != std::string::npos)
+            {
+                size_t cur = arrStart + 1;
+                while (cur < arrEnd)
+                {
+                    size_t objStart = rawJson.find('{', cur);
+                    if (objStart == std::string::npos || objStart >= arrEnd)
+                        break;
+                    size_t objEnd = rawJson.find('}', objStart);
+                    if (objEnd == std::string::npos || objEnd >= arrEnd)
+                        break;
+                    std::string obj = rawJson.substr(objStart, objEnd - objStart + 1);
+                    std::string kind  = extractJsonString(obj, "kind");
+                    std::string value = extractJsonString(obj, "value");
+                    if (kind == "SteamApp" && !value.empty())
+                        steamApps.insert(std::move(value));
+                    else if (kind == "Executable" && !value.empty())
+                        exeBasenames.insert(pathBasename(value));
+                    cur = objEnd + 1;
+                }
+            }
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(g_enabledMutex);
+            g_enabledSteamApps    = std::move(steamApps);
+            g_enabledExeBasenames = std::move(exeBasenames);
+        }
+        vkBasalt::Logger::info("ipc: games-enabled-update received — "
+                               + std::to_string(g_enabledSteamApps.size()) + " appids + "
+                               + std::to_string(g_enabledExeBasenames.size()) + " exe basenames");
+    }
+
+    bool isGameEnabled()
+    {
+        std::lock_guard<std::mutex> lock(g_enabledMutex);
+        if (const char* sid = std::getenv("SteamAppId"))
+        {
+            if (g_enabledSteamApps.count(sid))
+                return true;
+        }
+        const std::string base = currentExeBasename();
+        if (!base.empty() && g_enabledExeBasenames.count(base))
+            return true;
+        return false;
+    }
+
     bool isGameProcess()
     {
         // Computed once per process. argv[0] / env don't change at runtime
@@ -500,6 +662,42 @@ namespace gff
         g_initialized = true;
         if (!reg)
             return;
+
+        // One-shot legacy migration: if the user has a
+        // `~/.config/game-filters-flatpak/` tree from the pre-rename era but
+        // the new `~/.config/lumen/` tree doesn't exist yet, copy everything
+        // over. Subsequent slider writes land in the new tree and keep it
+        // current; the legacy tree is left in place as a manual backup.
+        {
+            const char* xdg = std::getenv("XDG_CONFIG_HOME");
+            const char* home = std::getenv("HOME");
+            fs::path configBase;
+            if (xdg && *xdg)
+                configBase = fs::path(xdg);
+            else if (home && *home)
+                configBase = fs::path(home) / ".config";
+            if (!configBase.empty())
+            {
+                fs::path legacyRoot = configBase / "game-filters-flatpak";
+                fs::path newRoot    = configBase / "lumen";
+                std::error_code existsEc;
+                if (fs::exists(legacyRoot, existsEc) && !fs::exists(newRoot, existsEc))
+                {
+                    std::error_code copyEc;
+                    fs::create_directories(newRoot.parent_path(), copyEc);
+                    fs::copy(legacyRoot, newRoot,
+                             fs::copy_options::recursive
+                               | fs::copy_options::skip_existing,
+                             copyEc);
+                    if (!copyEc)
+                        vkBasalt::Logger::info("profile: migrated legacy GameFiltersFlatpak data -> "
+                                               + newRoot.string());
+                    else
+                        vkBasalt::Logger::warn("profile: legacy-dir copy failed: "
+                                               + copyEc.message());
+                }
+            }
+        }
 
         g_state.gameName = detectGameName();
         std::error_code ec;
@@ -653,4 +851,4 @@ namespace gff
                                + (delta < 0 ? " up" : " down")
                                + " (chain=" + joinChain(chain) + ")");
     }
-} // namespace gff
+} // namespace lumen

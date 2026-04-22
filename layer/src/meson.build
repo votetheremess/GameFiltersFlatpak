@@ -12,7 +12,7 @@ imgui_src = [
 overlay_src = [
     'overlay/imgui_overlay.cpp',
     'overlay/profile_manager.cpp',
-    'overlay/theme_gff.cpp',
+    'overlay/theme_lumen.cpp',
     'overlay/view_add_effects.cpp',
     'overlay/view_configs.cpp',
     'overlay/view_debug.cpp',
@@ -50,10 +50,10 @@ vkBasalt_src = [
     'effects/builtin/effect_dls.cpp',
     'effects/builtin/effect_fxaa.cpp',
     'effects/builtin/effect_lut.cpp',
-    'effects/builtin/effect_gff_local.cpp',
-    'effects/builtin/effect_gff_tonal.cpp',
-    'effects/builtin/effect_gff_color.cpp',
-    'effects/builtin/effect_gff_stylistic.cpp',
+    'effects/builtin/effect_lumen_local.cpp',
+    'effects/builtin/effect_lumen_tonal.cpp',
+    'effects/builtin/effect_lumen_color.cpp',
+    'effects/builtin/effect_lumen_stylistic.cpp',
     'effects/builtin/effect_smaa.cpp',
     'reshade_parser.cpp',
     'fake_swapchain.cpp',
@@ -81,8 +81,8 @@ vkBasalt_src = [
 x11_dep = dependency('x11')
 xi_dep = dependency('xi')
 
-gff_x11_enabled = get_option('gff_x11')
-gff_x11_cpp_args = gff_x11_enabled ? [] : ['-DGFF_X11=0']
+lumen_x11_enabled = get_option('lumen_x11')
+lumen_x11_cpp_args = lumen_x11_enabled ? [] : ['-DLUMEN_X11=0']
 
 conf_paths = configuration_data()
 conf_paths.set_quoted('SYSCONFDIR', join_paths(get_option('prefix'), get_option('sysconfdir')))
@@ -107,7 +107,7 @@ shared_library(layer_lib_name,
     vkBasalt_src, overlay_src, imgui_src, shader_include,
     link_with: [keyboard_input_x11_lib, mouse_input_lib, input_blocker_lib],
     include_directories : [layer_include_path, imgui_inc, overlay_inc, effects_inc, effects_builtin_inc, effects_params_inc],
-    cpp_args : ['-DIMGUI_IMPL_VULKAN_NO_PROTOTYPES'] + gff_x11_cpp_args,
+    cpp_args : ['-DIMGUI_IMPL_VULKAN_NO_PROTOTYPES'] + lumen_x11_cpp_args,
     dependencies : [x11_dep, xi_dep, reshade_dep],
     gnu_symbol_visibility: 'hidden',
     install : true,

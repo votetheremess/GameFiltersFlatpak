@@ -28,7 +28,7 @@ namespace vkBasalt
             else
             {
                 // O_NOFOLLOW: refuse if the final path component is a symlink.
-                // GFF_LOG_FILE is env-supplied and could point at a symlink
+                // LUMEN_LOG_FILE is env-supplied and could point at a symlink
                 // planted by a hostile launcher; we don't want to truncate
                 // whatever it aliases.
                 int fd = ::open(filename.c_str(),
@@ -36,7 +36,7 @@ namespace vkBasalt
                                 0644);
                 if (fd < 0)
                 {
-                    std::cerr << "vkBasalt err:   refusing GFF_LOG_FILE '" << filename
+                    std::cerr << "vkBasalt err:   refusing LUMEN_LOG_FILE '" << filename
                               << "' (" << std::strerror(errno) << "); falling back to stderr" << std::endl;
                     m_outStream = std::unique_ptr<std::ostream, std::function<void(std::ostream*)>>(&std::cerr, [](std::ostream*) {});
                 }
@@ -161,7 +161,7 @@ namespace vkBasalt
             {"none", LogLevel::None},
         }};
 
-        const char* envVar = getenv("GFF_LOG_LEVEL");
+        const char* envVar = getenv("LUMEN_LOG_LEVEL");
 
         const std::string logLevelStr = envVar ? envVar : "";
 
@@ -176,7 +176,7 @@ namespace vkBasalt
 
     std::string Logger::getFileName()
     {
-        const char* envVar = getenv("GFF_LOG_FILE");
+        const char* envVar = getenv("LUMEN_LOG_FILE");
 
         std::string filename = envVar ? envVar : "";
 

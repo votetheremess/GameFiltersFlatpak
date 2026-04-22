@@ -1,4 +1,4 @@
-// GameFiltersFlatpak — tonal grading pass.
+// Lumen — tonal grading pass.
 // Fuses the five Brightness/Contrast sliders (Exposure, Contrast,
 // Shadows, Highlights, Gamma) into one shader. They must run together
 // because the math has no HDR float headroom between intermediate

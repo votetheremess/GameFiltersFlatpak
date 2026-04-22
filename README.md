@@ -1,8 +1,8 @@
-# GameFiltersFlatpak
+# Lumen
 
 A Linux Flatpak that replicates Nvidia's Freestyle / Game Filters experience. Install once, press a hotkey in any Vulkan game, tweak color / contrast / sharpening sliders with live in-game preview. System-tray daemon keeps the controller in the background.
 
-**Status:** scaffolded. Repo structure, Vulkan layer fork, implicit-layer manifest, Rust frontend skeleton, IPC protocol, and a combined V1 filter shader are all in place. End-to-end build + run is still TODO — the layer and shader code have not yet been compiled against the real Vulkan SDK on the target machine.
+**Status:** pre-release. End-to-end build and in-game overlay work on Bazzite KDE Plasma Wayland; profiles persist per-game; Freestyle-style add/remove/reorder of filter cards lands against Arc Raiders and other Vulkan titles via Flatpak Steam. Flatpak packaging is ready to submit to Flathub (pending icon and screenshot assets).
 
 ## What's different from existing Linux tools
 
@@ -14,14 +14,14 @@ No multi-tab admin UI in-game. Our overlay is a single-column slider panel sized
 
 Two Flatpak artifacts, one socket:
 
-- **`com.gamefiltersflatpak.VulkanLayer`** — Vulkan post-processing layer (C++, forked from [vkBasalt_overlay](https://github.com/Boux/vkBasalt_overlay), rebranded and converted to implicit). Lives at `layer/`.
-- **`com.gamefiltersflatpak.App`** — GTK4 + libadwaita frontend (Rust, matches the user's SteelSeries Flatpak stack). Tray icon, XDG GlobalShortcuts portal client, per-game profile management, IPC client to the layer. Lives at `frontend/`.
+- **`org.freedesktop.Platform.VulkanLayer.Lumen`** — Vulkan post-processing layer (C++, forked from [vkBasalt_overlay](https://github.com/Boux/vkBasalt_overlay), rebranded and converted to implicit). Shipped as a Flathub Vulkan-layer extension so Flatpak Steam auto-loads it into Proton games. Lives at `layer/`.
+- **`io.github.votetheremess.Lumen`** — GTK4 + libadwaita frontend (Rust). Tray icon, XDG GlobalShortcuts portal client, per-game profile management, IPC server to the layer. Lives at `frontend/`.
 
-They communicate over `$XDG_RUNTIME_DIR/game-filters-flatpak.sock` using length-prefixed JSON — see [`docs/ipc-protocol.md`](docs/ipc-protocol.md).
+They communicate over `$XDG_RUNTIME_DIR/lumen.sock` using length-prefixed JSON — see [`docs/ipc-protocol.md`](docs/ipc-protocol.md).
 
 ## V1 Filter Scope
 
-Four chained fragment-shader passes, each with its own sliders. The overlay starts empty — press **Add** on a card to activate it, **Up** / **Down** to reorder, **Remove** to drop it. Shaders live at `layer/src/shader/gff_{local,tonal,color,stylistic}.frag.glsl`.
+Four chained fragment-shader passes, each with its own sliders. The overlay starts empty — press **Add** on a card to activate it, **Up** / **Down** to reorder, **Remove** to drop it. Shaders live at `layer/src/shader/lumen_{local,tonal,color,stylistic}.frag.glsl`.
 
 | Card | Sliders |
 |---|---|
@@ -30,7 +30,7 @@ Four chained fragment-shader passes, each with its own sliders. The overlay star
 | **Details** | Sharpen, Clarity, HDR Toning, Bloom |
 | **Effects** | Vignette, Black & White |
 
-Slider ranges follow Nvidia's public scale (bipolar ±100, unipolar 0–100, hue 0–360) so Windows preset values paste in directly. Upstream's CAS pass is also available — chain it ahead of the GFF cards for higher-quality adaptive sharpening. Tilt-Shift, Painterly, Depth of Field, and RTX HDR / RTX Dynamic Vibrance approximations are deferred post-v1.
+Slider ranges follow Nvidia's public scale (bipolar ±100, unipolar 0–100, hue 0–360) so Windows preset values paste in directly. Upstream's CAS pass is also available — chain it ahead of the Lumen cards for higher-quality adaptive sharpening. Tilt-Shift, Painterly, Depth of Field, and RTX HDR / RTX Dynamic Vibrance approximations are deferred post-v1.
 
 ## Supported Environments (v1)
 
@@ -52,23 +52,24 @@ distrobox enter fedora-dev -- meson compile -C layer/builddir
 distrobox enter fedora-dev -- cargo build --manifest-path frontend/Cargo.toml
 
 # Run on host
-./frontend/target/debug/game-filters-flatpak
+./frontend/target/debug/lumen
 ```
 
 Flatpak build (once ready for release):
 
 ```sh
 distrobox enter fedora-dev -- flatpak-builder --user --install --force-clean \
-  build-flatpak flatpak/com.gamefiltersflatpak.VulkanLayer.yml
+  build-layer flatpak/org.freedesktop.Platform.VulkanLayer.Lumen.yml
 distrobox enter fedora-dev -- flatpak-builder --user --install --force-clean \
-  build-flatpak flatpak/com.gamefiltersflatpak.App.yml
+  build-app flatpak/io.github.votetheremess.Lumen.yml
 ```
 
 Verify (on host):
 
 ```sh
-vulkaninfo | grep -i game-filters    # layer auto-loaded
-vkcube                                 # pass-through smoke test
+vulkaninfo | grep -i lumen    # layer auto-loaded
+vkcube                          # pass-through smoke test
+flatpak run io.github.votetheremess.Lumen    # launches the tray daemon + GTK window
 ```
 
 ## Package requirements (inside `fedora-dev` distrobox)

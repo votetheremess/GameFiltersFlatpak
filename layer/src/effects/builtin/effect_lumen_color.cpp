@@ -1,4 +1,4 @@
-#include "effect_gff_local.hpp"
+#include "effect_lumen_color.hpp"
 
 #include <array>
 #include <cstring>
@@ -13,40 +13,40 @@ namespace vkBasalt
     namespace
     {
         // Order must match the `constant_id = N` declarations in
-        // gff_local.frag.glsl.
-        struct GffLocalParams
+        // lumen_color.frag.glsl.
+        struct LumenColorParams
         {
-            float sharpen;    // [   0, 100]
-            float clarity;    // [   0, 100]
-            float hdrToning;  // [   0, 100]
-            float bloom;      // [   0, 100]
+            float tintColor;      // [   0, 360] hue degrees
+            float tintIntensity;  // [   0, 100]
+            float temperature;    // [-100, 100]
+            float vibrance;       // [-100, 100]
         };
 
-        GffLocalParams readParams(Config* pConfig)
+        LumenColorParams readParams(Config* pConfig)
         {
-            return GffLocalParams{
-                pConfig->getOption<float>("gff.sharpen",   0.0f),
-                pConfig->getOption<float>("gff.clarity",   0.0f),
-                pConfig->getOption<float>("gff.hdrToning", 0.0f),
-                pConfig->getOption<float>("gff.bloom",     0.0f),
+            return LumenColorParams{
+                pConfig->getOption<float>("lumen.tintColor",     0.0f),
+                pConfig->getOption<float>("lumen.tintIntensity", 0.0f),
+                pConfig->getOption<float>("lumen.temperature",   0.0f),
+                pConfig->getOption<float>("lumen.vibrance",      0.0f),
             };
         }
     } // namespace
 
-    GffLocalEffect::GffLocalEffect(LogicalDevice*       pLogicalDevice,
+    LumenColorEffect::LumenColorEffect(LogicalDevice*       pLogicalDevice,
                                    VkFormat             format,
                                    VkExtent2D           imageExtent,
                                    std::vector<VkImage> inputImages,
                                    std::vector<VkImage> outputImages,
                                    Config*              pConfig)
     {
-        static GffLocalParams params;
+        static LumenColorParams params;
         params = readParams(pConfig);
 
         vertexCode   = full_screen_triangle_vert;
-        fragmentCode = gff_local_frag;
+        fragmentCode = lumen_color_frag;
 
-        constexpr size_t kParamCount = sizeof(GffLocalParams) / sizeof(float);
+        constexpr size_t kParamCount = sizeof(LumenColorParams) / sizeof(float);
         static std::array<VkSpecializationMapEntry, kParamCount> entries = []() {
             std::array<VkSpecializationMapEntry, kParamCount> e{};
             for (uint32_t i = 0; i < e.size(); ++i)
@@ -61,21 +61,18 @@ namespace vkBasalt
         static VkSpecializationInfo specInfo{};
         specInfo.mapEntryCount = static_cast<uint32_t>(entries.size());
         specInfo.pMapEntries   = entries.data();
-        specInfo.dataSize      = sizeof(GffLocalParams);
+        specInfo.dataSize      = sizeof(LumenColorParams);
         specInfo.pData         = &params;
 
         pVertexSpecInfo   = nullptr;
         pFragmentSpecInfo = &specInfo;
 
-        // Pin the image view to the UNORM alias so the hardware sampler
-        // never auto-linearizes or sRGB-encodes. Matches the upstream
-        // Freestyle math which runs in gamma-encoded sRGB directly.
         const VkFormat unormView = convertToUNORM(format);
-        Logger::info("gff_local: swapchain format=" + convertToString(format)
+        Logger::info("lumen_color: swapchain format=" + convertToString(format)
                      + " using view format=" + convertToString(unormView));
 
         init(pLogicalDevice, format, imageExtent, inputImages, outputImages, pConfig, unormView);
     }
 
-    GffLocalEffect::~GffLocalEffect() = default;
+    LumenColorEffect::~LumenColorEffect() = default;
 } // namespace vkBasalt

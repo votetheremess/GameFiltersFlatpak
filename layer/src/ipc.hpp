@@ -1,18 +1,18 @@
-#ifndef GFF_IPC_HPP_INCLUDED
-#define GFF_IPC_HPP_INCLUDED
+#ifndef LUMEN_IPC_HPP_INCLUDED
+#define LUMEN_IPC_HPP_INCLUDED
 
 #include <atomic>
 #include <functional>
 #include <string>
 #include <thread>
 
-namespace gff
+namespace lumen
 {
     // Canonical socket name, shared by the filesystem path
     // (`$XDG_RUNTIME_DIR/<name>`) and the Linux abstract namespace
     // (`@<name>`). Frontend (Rust), scripts/run.sh, and docs all hardcode
     // the same literal — if this ever changes, grep the whole repo.
-    inline constexpr const char* kSocketName = "game-filters-flatpak.sock";
+    inline constexpr const char* kSocketName = "lumen.sock";
 
     // A command received from the frontend. `raw_json` is the untouched
     // payload in case the handler wants to parse more fields than just `type`.
@@ -58,6 +58,6 @@ namespace gff
         std::thread        m_thread;
         std::string        m_socketPath;
     };
-} // namespace gff
+} // namespace lumen
 
-#endif // GFF_IPC_HPP_INCLUDED
+#endif // LUMEN_IPC_HPP_INCLUDED

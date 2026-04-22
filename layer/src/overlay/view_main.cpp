@@ -3,7 +3,7 @@
 #include "effects/params/effect_param.hpp"
 #include "logger.hpp"
 #include "profile_manager.hpp"
-#include "theme_gff.hpp"
+#include "theme_lumen.hpp"
 
 #include <algorithm>
 #include <string>
@@ -41,7 +41,7 @@ namespace vkBasalt
 
         void boldText(const char* s, float alpha = 0.92f)
         {
-            ImFont* bold = gff::boldFont();
+            ImFont* bold = lumen::boldFont();
             if (bold)
                 ImGui::PushFont(bold);
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, alpha));
@@ -71,12 +71,12 @@ namespace vkBasalt
             // Persist to the active per-game profile file on every change.
             // The .conf file is <1 KiB so this is faster than the debounce
             // window; no queueing/batching needed.
-            gff::saveActiveProfile(reg);
+            lumen::saveActiveProfile(reg);
         }
 
         void renderProfileTabs(EffectRegistry* reg, ImGuiOverlay* overlay)
         {
-            const auto& pm = gff::state();
+            const auto& pm = lumen::state();
 
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 0.65f));
             ImGui::Text("Game: %s", pm.gameName.empty() ? "default" : pm.gameName.c_str());
@@ -87,8 +87,8 @@ namespace vkBasalt
             const float spacing = ImGui::GetStyle().ItemSpacing.x;
             const float btnW    = (avail - spacing * 2.0f) / 3.0f;
 
-            const ImVec4 activeCol    = ImVec4(0.46f, 0.76f, 1.00f, 0.85f);
-            const ImVec4 activeHovCol = ImVec4(0.55f, 0.82f, 1.00f, 0.95f);
+            const ImVec4 activeCol    = ImVec4(0.00f, 0.96f, 1.00f, 0.85f);  // #00F5FF electric cyan
+            const ImVec4 activeHovCol = ImVec4(0.30f, 1.00f, 1.00f, 0.95f);  // brighter hover variant
 
             for (int i = 1; i <= 3; ++i)
             {
@@ -106,7 +106,7 @@ namespace vkBasalt
                 ImGui::PushID(i);
                 std::string label = "Profile " + std::to_string(i);
                 if (ImGui::Button(label.c_str(), ImVec2(btnW, 0.0f)) && !isActive)
-                    gff::switchProfile(i, reg, overlay);
+                    lumen::switchProfile(i, reg, overlay);
                 ImGui::PopID();
 
                 if (isActive)
@@ -117,12 +117,12 @@ namespace vkBasalt
 
         // Single slider row — label column, slider filling middle, reset
         // button at the right. `effectName` is the card's owning effect
-        // (e.g. "gff_tonal") so the write routes to the right SPIR-V
+        // (e.g. "lumen_tonal") so the write routes to the right SPIR-V
         // specialization-constant set.
         void sliderRow(EffectRegistry*        reg,
                        ImGuiOverlay*          overlay,
                        const char*            effectName,
-                       const gff::CardSlider& s)
+                       const lumen::CardSlider& s)
         {
             auto* param = reg->getParameter(effectName, s.key);
             if (!param)
@@ -163,7 +163,7 @@ namespace vkBasalt
         // cards don't offer nonsensical moves.
         void renderActiveCardHeader(EffectRegistry*     reg,
                                     ImGuiOverlay*       overlay,
-                                    const gff::CardDef& card,
+                                    const lumen::CardDef& card,
                                     bool                canUp,
                                     bool                canDown)
         {
@@ -180,18 +180,18 @@ namespace vkBasalt
 
             ImGui::BeginDisabled(!canUp);
             if (ImGui::Button("Up", ImVec2(kActionWidth, 0.0f)))
-                gff::moveCard(card.effectName, -1, reg, overlay);
+                lumen::moveCard(card.effectName, -1, reg, overlay);
             ImGui::EndDisabled();
 
             ImGui::SameLine();
             ImGui::BeginDisabled(!canDown);
             if (ImGui::Button("Down", ImVec2(kActionWidth, 0.0f)))
-                gff::moveCard(card.effectName, +1, reg, overlay);
+                lumen::moveCard(card.effectName, +1, reg, overlay);
             ImGui::EndDisabled();
 
             ImGui::SameLine();
             if (ImGui::Button("Remove", ImVec2(kActionWidth, 0.0f)))
-                gff::removeCard(card.effectName, reg, overlay);
+                lumen::removeCard(card.effectName, reg, overlay);
 
             ImGui::PopID();
             ImGui::Dummy(ImVec2(0.0f, 3.0f));
@@ -201,7 +201,7 @@ namespace vkBasalt
         // muted title on the left, "Add" button right-aligned.
         void renderInactiveCardRow(EffectRegistry*     reg,
                                    ImGuiOverlay*       overlay,
-                                   const gff::CardDef& card)
+                                   const lumen::CardDef& card)
         {
             ImGui::PushID(card.effectName);
 
@@ -211,14 +211,14 @@ namespace vkBasalt
             mutedText(card.title);
             ImGui::SameLine(avail - kActionWidth);
             if (ImGui::Button("Add", ImVec2(kActionWidth, 0.0f)))
-                gff::addCard(card.effectName, reg, overlay);
+                lumen::addCard(card.effectName, reg, overlay);
 
             ImGui::PopID();
         }
 
-        const gff::CardDef* findCard(const std::string& effectName)
+        const lumen::CardDef* findCard(const std::string& effectName)
         {
-            for (const auto& c : gff::cards())
+            for (const auto& c : lumen::cards())
                 if (effectName == c.effectName)
                     return &c;
             return nullptr;
@@ -231,11 +231,11 @@ namespace vkBasalt
             return;
 
         // Profile selector strip at the top — three slots per game, state
-        // stored in ~/.config/game-filters-flatpak/games/<exe>/.
+        // stored in ~/.config/lumen/games/<exe>/.
         renderProfileTabs(pEffectRegistry, this);
 
         const auto& chain    = pEffectRegistry->getSelectedEffects();
-        const auto& allCards = gff::cards();
+        const auto& allCards = lumen::cards();
 
         // Active-filters section. Renders active cards in chain order.
         // When nothing is active, shows a muted hint pointing users to
@@ -254,7 +254,7 @@ namespace vkBasalt
             {
                 const auto* card = findCard(chain[i]);
                 if (!card)
-                    continue;  // non-gff effect in the chain — skip, not our UI
+                    continue;  // non-lumen effect in the chain — skip, not our UI
 
                 const bool canUp   = (i > 0);
                 const bool canDown = (i + 1 < chain.size());
@@ -273,7 +273,7 @@ namespace vkBasalt
         // Add-filter section. Lists canonical cards that aren't already in
         // the chain, in the canonical order. Hidden when all four cards
         // are active.
-        std::vector<const gff::CardDef*> inactive;
+        std::vector<const lumen::CardDef*> inactive;
         for (const auto& card : allCards)
         {
             if (std::find(chain.begin(), chain.end(), std::string(card.effectName)) == chain.end())

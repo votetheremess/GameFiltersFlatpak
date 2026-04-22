@@ -43,7 +43,7 @@ namespace vkBasalt
     class ConfigSerializer
     {
     public:
-        // Save a game-specific config to ~/.config/game-filters-flatpak/configs/<name>.conf
+        // Save a game-specific config to ~/.config/lumen/configs/<name>.conf
         // effects: all effects in the list (enabled + disabled)
         // disabledEffects: effects that are unchecked (won't be rendered)
         // params: all effect parameters
@@ -57,10 +57,10 @@ namespace vkBasalt
             const std::map<std::string, std::string>& effectPaths = {},
             const std::vector<PreprocessorDefinition>& preprocessorDefs = {});
 
-        // Get the base config directory path (~/.config/game-filters-flatpak/)
+        // Get the base config directory path (~/.config/lumen/)
         static std::string getBaseConfigDir();
 
-        // Get the configs directory path (~/.config/game-filters-flatpak/configs/)
+        // Get the configs directory path (~/.config/lumen/configs/)
         static std::string getConfigsDir();
 
         // List available config files

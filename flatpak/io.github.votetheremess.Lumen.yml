@@ -1,0 +1,56 @@
+app-id: io.github.votetheremess.Lumen
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: lumen
+finish-args:
+  # Wayland + fallback X11 for GTK.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # System tray (StatusNotifierItem / KStatusNotifierItem via D-Bus).
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.freedesktop.Notifications
+  # XDG GlobalShortcuts portal + core portals.
+  - --talk-name=org.freedesktop.portal.*
+  # IPC socket to the Vulkan layer; both artifacts share this path.
+  - --filesystem=xdg-run/lumen.sock
+  # Per-game profiles + active config.
+  - --filesystem=xdg-config/lumen:create
+  # Scan running games over /proc for the auto-profile matching.
+  - --filesystem=/proc:ro
+  # Read-only access to the three canonical Steam install paths on Linux
+  # so the game-library scanner can find installed games without the user
+  # having to pick every path via the portal. Narrow and scoped — Flathub
+  # accepts this shape for "integrates with Steam"-class apps.
+  # User-added scan locations go through the FileChooserPortal, which
+  # grants per-path tokens without needing manifest perms.
+  - --filesystem=~/.local/share/Steam/steamapps:ro
+  - --filesystem=~/.var/app/com.valvesoftware.Steam/data/Steam/steamapps:ro
+  - --filesystem=~/.steam/steam/steamapps:ro
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  build-args:
+    - --share=network
+  env:
+    CARGO_HOME: /run/build/lumen/cargo
+modules:
+  - name: lumen
+    buildsystem: simple
+    build-commands:
+      - cargo --offline fetch --manifest-path frontend/Cargo.toml --verbose
+      - cargo --offline build --release --manifest-path frontend/Cargo.toml
+      - install -Dm755 frontend/target/release/lumen ${FLATPAK_DEST}/bin/lumen
+      - install -Dm644 frontend/data/io.github.votetheremess.Lumen.desktop ${FLATPAK_DEST}/share/applications/io.github.votetheremess.Lumen.desktop
+      - install -Dm644 frontend/data/io.github.votetheremess.Lumen.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.votetheremess.Lumen.metainfo.xml
+      # Icons — SVG primary, PNG fallbacks at 128/256 (Flathub minimum).
+      # User creates these in Figma per specs in the plan file; install
+      # steps below will start failing until the SVG/PNGs exist.
+      - install -Dm644 frontend/data/icons/hicolor/scalable/apps/io.github.votetheremess.Lumen.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.votetheremess.Lumen.svg
+      - install -Dm644 frontend/data/icons/hicolor/128x128/apps/io.github.votetheremess.Lumen.png ${FLATPAK_DEST}/share/icons/hicolor/128x128/apps/io.github.votetheremess.Lumen.png
+      - install -Dm644 frontend/data/icons/hicolor/256x256/apps/io.github.votetheremess.Lumen.png ${FLATPAK_DEST}/share/icons/hicolor/256x256/apps/io.github.votetheremess.Lumen.png
+    sources:
+      - type: dir
+        path: ..

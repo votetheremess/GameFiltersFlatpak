@@ -6,10 +6,10 @@
 #include "effect_smaa.hpp"
 #include "effect_deband.hpp"
 #include "effect_lut.hpp"
-#include "effect_gff_local.hpp"
-#include "effect_gff_tonal.hpp"
-#include "effect_gff_color.hpp"
-#include "effect_gff_stylistic.hpp"
+#include "effect_lumen_local.hpp"
+#include "effect_lumen_tonal.hpp"
+#include "effect_lumen_color.hpp"
+#include "effect_lumen_stylistic.hpp"
 
 namespace vkBasalt
 {
@@ -138,65 +138,65 @@ namespace vkBasalt
         // Windows preset values paste in directly.
 
         // Local / spatial: Sharpen, Clarity, HDR Toning, Bloom.
-        effects["gff_local"] = {
-            "gff_local",
+        effects["lumen_local"] = {
+            "lumen_local",
             false,  // uses UNORM — math calibrated in sRGB-encoded space
             {
-                {"gff.sharpen",   "Sharpen",    ParamType::Float, 0.0f, 0.0f, 100.0f},
-                {"gff.clarity",   "Clarity",    ParamType::Float, 0.0f, 0.0f, 100.0f},
-                {"gff.hdrToning", "HDR Toning", ParamType::Float, 0.0f, 0.0f, 100.0f},
-                {"gff.bloom",     "Bloom",      ParamType::Float, 0.0f, 0.0f, 100.0f},
+                {"lumen.sharpen",   "Sharpen",    ParamType::Float, 0.0f, 0.0f, 100.0f},
+                {"lumen.clarity",   "Clarity",    ParamType::Float, 0.0f, 0.0f, 100.0f},
+                {"lumen.hdrToning", "HDR Toning", ParamType::Float, 0.0f, 0.0f, 100.0f},
+                {"lumen.bloom",     "Bloom",      ParamType::Float, 0.0f, 0.0f, 100.0f},
             },
             [](LogicalDevice* dev, VkFormat fmt, VkExtent2D ext,
                std::vector<VkImage> in, std::vector<VkImage> out, Config* cfg) {
-                return std::make_shared<GffLocalEffect>(dev, fmt, ext, in, out, cfg);
+                return std::make_shared<LumenLocalEffect>(dev, fmt, ext, in, out, cfg);
             }
         };
 
         // Tonal: Exposure, Contrast, Highlights, Shadows, Gamma.
-        effects["gff_tonal"] = {
-            "gff_tonal",
+        effects["lumen_tonal"] = {
+            "lumen_tonal",
             false,
             {
-                {"gff.exposure",   "Exposure",   ParamType::Float, 0.0f, -100.0f, 100.0f},
-                {"gff.contrast",   "Contrast",   ParamType::Float, 0.0f, -100.0f, 100.0f},
-                {"gff.highlights", "Highlights", ParamType::Float, 0.0f, -100.0f, 100.0f},
-                {"gff.shadows",    "Shadows",    ParamType::Float, 0.0f, -100.0f, 100.0f},
-                {"gff.gamma",      "Gamma",      ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.exposure",   "Exposure",   ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.contrast",   "Contrast",   ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.highlights", "Highlights", ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.shadows",    "Shadows",    ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.gamma",      "Gamma",      ParamType::Float, 0.0f, -100.0f, 100.0f},
             },
             [](LogicalDevice* dev, VkFormat fmt, VkExtent2D ext,
                std::vector<VkImage> in, std::vector<VkImage> out, Config* cfg) {
-                return std::make_shared<GffTonalEffect>(dev, fmt, ext, in, out, cfg);
+                return std::make_shared<LumenTonalEffect>(dev, fmt, ext, in, out, cfg);
             }
         };
 
         // Color: Tint Color, Tint Intensity, Temperature, Vibrance.
-        effects["gff_color"] = {
-            "gff_color",
+        effects["lumen_color"] = {
+            "lumen_color",
             false,
             {
-                {"gff.tintColor",     "Tint Color",     ParamType::Float, 0.0f,    0.0f, 360.0f},
-                {"gff.tintIntensity", "Tint Intensity", ParamType::Float, 0.0f,    0.0f, 100.0f},
-                {"gff.temperature",   "Temperature",    ParamType::Float, 0.0f, -100.0f, 100.0f},
-                {"gff.vibrance",      "Vibrance",       ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.tintColor",     "Tint Color",     ParamType::Float, 0.0f,    0.0f, 360.0f},
+                {"lumen.tintIntensity", "Tint Intensity", ParamType::Float, 0.0f,    0.0f, 100.0f},
+                {"lumen.temperature",   "Temperature",    ParamType::Float, 0.0f, -100.0f, 100.0f},
+                {"lumen.vibrance",      "Vibrance",       ParamType::Float, 0.0f, -100.0f, 100.0f},
             },
             [](LogicalDevice* dev, VkFormat fmt, VkExtent2D ext,
                std::vector<VkImage> in, std::vector<VkImage> out, Config* cfg) {
-                return std::make_shared<GffColorEffect>(dev, fmt, ext, in, out, cfg);
+                return std::make_shared<LumenColorEffect>(dev, fmt, ext, in, out, cfg);
             }
         };
 
         // Stylistic: Vignette, Black & White.
-        effects["gff_stylistic"] = {
-            "gff_stylistic",
+        effects["lumen_stylistic"] = {
+            "lumen_stylistic",
             false,
             {
-                {"gff.vignette",    "Vignette",      ParamType::Float, 0.0f, 0.0f, 100.0f},
-                {"gff.bwIntensity", "Black & White", ParamType::Float, 0.0f, 0.0f, 100.0f},
+                {"lumen.vignette",    "Vignette",      ParamType::Float, 0.0f, 0.0f, 100.0f},
+                {"lumen.bwIntensity", "Black & White", ParamType::Float, 0.0f, 0.0f, 100.0f},
             },
             [](LogicalDevice* dev, VkFormat fmt, VkExtent2D ext,
                std::vector<VkImage> in, std::vector<VkImage> out, Config* cfg) {
-                return std::make_shared<GffStylisticEffect>(dev, fmt, ext, in, out, cfg);
+                return std::make_shared<LumenStylisticEffect>(dev, fmt, ext, in, out, cfg);
             }
         };
     }

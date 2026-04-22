@@ -1,4 +1,4 @@
-#include "effect_gff_stylistic.hpp"
+#include "effect_lumen_stylistic.hpp"
 
 #include <array>
 #include <cstring>
@@ -13,36 +13,36 @@ namespace vkBasalt
     namespace
     {
         // Order must match the `constant_id = N` declarations in
-        // gff_stylistic.frag.glsl.
-        struct GffStylisticParams
+        // lumen_stylistic.frag.glsl.
+        struct LumenStylisticParams
         {
             float vignette;     // [0, 100]
             float bwIntensity;  // [0, 100]
         };
 
-        GffStylisticParams readParams(Config* pConfig)
+        LumenStylisticParams readParams(Config* pConfig)
         {
-            return GffStylisticParams{
-                pConfig->getOption<float>("gff.vignette",    0.0f),
-                pConfig->getOption<float>("gff.bwIntensity", 0.0f),
+            return LumenStylisticParams{
+                pConfig->getOption<float>("lumen.vignette",    0.0f),
+                pConfig->getOption<float>("lumen.bwIntensity", 0.0f),
             };
         }
     } // namespace
 
-    GffStylisticEffect::GffStylisticEffect(LogicalDevice*       pLogicalDevice,
+    LumenStylisticEffect::LumenStylisticEffect(LogicalDevice*       pLogicalDevice,
                                            VkFormat             format,
                                            VkExtent2D           imageExtent,
                                            std::vector<VkImage> inputImages,
                                            std::vector<VkImage> outputImages,
                                            Config*              pConfig)
     {
-        static GffStylisticParams params;
+        static LumenStylisticParams params;
         params = readParams(pConfig);
 
         vertexCode   = full_screen_triangle_vert;
-        fragmentCode = gff_stylistic_frag;
+        fragmentCode = lumen_stylistic_frag;
 
-        constexpr size_t kParamCount = sizeof(GffStylisticParams) / sizeof(float);
+        constexpr size_t kParamCount = sizeof(LumenStylisticParams) / sizeof(float);
         static std::array<VkSpecializationMapEntry, kParamCount> entries = []() {
             std::array<VkSpecializationMapEntry, kParamCount> e{};
             for (uint32_t i = 0; i < e.size(); ++i)
@@ -57,18 +57,18 @@ namespace vkBasalt
         static VkSpecializationInfo specInfo{};
         specInfo.mapEntryCount = static_cast<uint32_t>(entries.size());
         specInfo.pMapEntries   = entries.data();
-        specInfo.dataSize      = sizeof(GffStylisticParams);
+        specInfo.dataSize      = sizeof(LumenStylisticParams);
         specInfo.pData         = &params;
 
         pVertexSpecInfo   = nullptr;
         pFragmentSpecInfo = &specInfo;
 
         const VkFormat unormView = convertToUNORM(format);
-        Logger::info("gff_stylistic: swapchain format=" + convertToString(format)
+        Logger::info("lumen_stylistic: swapchain format=" + convertToString(format)
                      + " using view format=" + convertToString(unormView));
 
         init(pLogicalDevice, format, imageExtent, inputImages, outputImages, pConfig, unormView);
     }
 
-    GffStylisticEffect::~GffStylisticEffect() = default;
+    LumenStylisticEffect::~LumenStylisticEffect() = default;
 } // namespace vkBasalt

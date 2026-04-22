@@ -29,20 +29,20 @@ namespace vkBasalt
 #include "lut.frag.h"
     };
 
-    const std::vector<uint32_t> gff_local_frag = {
-#include "gff_local.frag.h"
+    const std::vector<uint32_t> lumen_local_frag = {
+#include "lumen_local.frag.h"
     };
 
-    const std::vector<uint32_t> gff_tonal_frag = {
-#include "gff_tonal.frag.h"
+    const std::vector<uint32_t> lumen_tonal_frag = {
+#include "lumen_tonal.frag.h"
     };
 
-    const std::vector<uint32_t> gff_color_frag = {
-#include "gff_color.frag.h"
+    const std::vector<uint32_t> lumen_color_frag = {
+#include "lumen_color.frag.h"
     };
 
-    const std::vector<uint32_t> gff_stylistic_frag = {
-#include "gff_stylistic.frag.h"
+    const std::vector<uint32_t> lumen_stylistic_frag = {
+#include "lumen_stylistic.frag.h"
     };
 
     const std::vector<uint32_t> smaa_blend_frag = {

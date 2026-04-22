@@ -1,0 +1,18 @@
+{
+  "file_format_version" : "1.0.0",
+  "layer" : {
+    "name": "VK_LAYER_LUMEN_post_processing",
+    "type": "GLOBAL",
+    "library_path": "liblumen.so",
+    "api_version": "1.4.341",
+    "implementation_version": "1",
+    "description": "Lumen post-processing layer (Nvidia Freestyle-style filters for Linux)",
+    "functions": {
+      "vkGetInstanceProcAddr": "lumen_GetInstanceProcAddr",
+      "vkGetDeviceProcAddr":   "lumen_GetDeviceProcAddr"
+    },
+    "disable_environment": {
+      "LUMEN_DISABLE": "1"
+    }
+  }
+}

@@ -15,7 +15,7 @@
 #include "imgui/imgui_internal.h"
 #include "imgui/backends/imgui_impl_vulkan.h"
 
-#include "theme_gff.hpp"
+#include "theme_lumen.hpp"
 #include "profile_manager.hpp"
 
 namespace vkBasalt
@@ -138,11 +138,11 @@ namespace vkBasalt
         // at 16px — ImGui's default ProggyClean at 13px is too small on modern
         // displays. Must happen before initVulkanBackend() because that
         // uploads the font atlas to the GPU.
-        gff::loadFonts();
+        lumen::loadFonts();
 
         // Apply our project's overlay theme (translucent window, hairline
         // border, cool-cyan accents) instead of the default ImGui Dark theme.
-        gff::applyOverlayTheme();
+        lumen::applyOverlayTheme();
 
         initVulkanBackend(swapchainFormat, imageCount);
 
@@ -522,7 +522,7 @@ namespace vkBasalt
                                | ImGuiWindowFlags_NoCollapse
                                | ImGuiWindowFlags_NoDocking
                                | ImGuiWindowFlags_NoBringToFrontOnFocus;
-        if (ImGui::Begin("Game Filters", nullptr, flags))
+        if (ImGui::Begin("Lumen", nullptr, flags))
         {
             renderMainView(keyboard);
         }
@@ -544,7 +544,7 @@ namespace vkBasalt
         static bool firstFrame = true;
         if (firstFrame)
         {
-            ImGui::SetWindowFocus("Game Filters");
+            ImGui::SetWindowFocus("Lumen");
             firstFrame = false;
         }
 

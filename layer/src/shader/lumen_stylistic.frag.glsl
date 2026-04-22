@@ -1,4 +1,4 @@
-// GameFiltersFlatpak — stylistic / mood pass.
+// Lumen — stylistic / mood pass.
 // Black & White desaturation and radial Vignette. Traditionally applied
 // near the end of a grading chain; in the multi-pass model the user can
 // position this pass anywhere they like, with the understanding that

@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixListener;
@@ -8,8 +8,9 @@ use tokio::sync::{broadcast, mpsc, Mutex};
 // Protocol invariant — must match `kSocketName` in layer/src/ipc.hpp and
 // the `SOCKET` variable in scripts/run.sh. Used for both the filesystem
 // path (`$XDG_RUNTIME_DIR/<name>`) and the abstract namespace (`@<name>`).
-const SOCKET_NAME: &str = "game-filters-flatpak.sock";
+const SOCKET_NAME: &str = "lumen.sock";
 
+use crate::games::GameId;
 use crate::messages::{FrontendCommand, LayerEvent};
 
 const MAX_PAYLOAD: u32 = 64 * 1024;
@@ -35,9 +36,15 @@ pub enum IpcError {
 /// Handle given to UI code. Internally owns a broadcast sender — every
 /// layer that connects gets a tokio task subscribed to the channel, so
 /// UI-side `send()` reaches all layers simultaneously.
+///
+/// Also caches the current enabled-games list so a newly-connecting
+/// layer receives the snapshot immediately on connect (avoiding a race
+/// where the layer's first `vkCreateSwapchainKHR` fires before a UI
+/// event that would have broadcast the list).
 #[derive(Clone)]
 pub struct Client {
     tx: broadcast::Sender<FrontendCommand>,
+    enabled_games: Arc<StdMutex<Vec<GameId>>>,
     #[allow(dead_code)]
     events: Arc<Mutex<mpsc::Receiver<LayerEvent>>>,
 }
@@ -46,21 +53,24 @@ impl Client {
     pub fn spawn() -> Self {
         let (cmd_tx, _cmd_rx) = broadcast::channel::<FrontendCommand>(BROADCAST_CAP);
         let (evt_tx, evt_rx) = mpsc::channel::<LayerEvent>(32);
+        let enabled_games: Arc<StdMutex<Vec<GameId>>> = Arc::new(StdMutex::new(Vec::new()));
 
         let cmd_tx_for_task = cmd_tx.clone();
+        let enabled_for_task = Arc::clone(&enabled_games);
         std::thread::Builder::new()
-            .name("gff-ipc".to_owned())
+            .name("lumen-ipc".to_owned())
             .spawn(move || {
                 let rt = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()
                     .expect("tokio rt");
-                rt.block_on(run_server(cmd_tx_for_task, evt_tx));
+                rt.block_on(run_server(cmd_tx_for_task, evt_tx, enabled_for_task));
             })
             .expect("spawn ipc thread");
 
         Client {
             tx: cmd_tx,
+            enabled_games,
             events: Arc::new(Mutex::new(evt_rx)),
         }
     }
@@ -70,6 +80,18 @@ impl Client {
             Ok(n) => log::debug!("ipc: broadcast to {n} layer client(s)"),
             Err(_) => log::debug!("ipc: no layer clients connected; dropping command"),
         }
+    }
+
+    /// Update the cached enabled-games list AND broadcast it to every
+    /// currently-connected layer. Called by the UI on startup (once with
+    /// the disk-loaded state) and on every toggle change. The cache ensures
+    /// future layer connects see the current list without needing the UI
+    /// to re-emit.
+    pub fn update_enabled_games(&self, enabled: Vec<GameId>) {
+        if let Ok(mut guard) = self.enabled_games.lock() {
+            *guard = enabled.clone();
+        }
+        self.send(FrontendCommand::GamesEnabledUpdate { enabled });
     }
 }
 
@@ -98,6 +120,7 @@ impl Drop for SocketGuard {
 async fn run_server(
     cmd_tx: broadcast::Sender<FrontendCommand>,
     evt_tx: mpsc::Sender<LayerEvent>,
+    enabled_games: Arc<StdMutex<Vec<GameId>>>,
 ) {
     // 1. Filesystem socket — normal Unix path; works for host-only games and
     //    any Flatpak that shares our xdg-run path.
@@ -156,8 +179,17 @@ async fn run_server(
                 log::info!("ipc: layer client connected via {kind} socket");
                 let cmd_rx = cmd_tx.subscribe();
                 let evt_tx = evt_tx.clone();
+                // Snapshot the enabled list at connect time; pushed as
+                // the first frame so the layer knows immediately which
+                // games should have the overlay active. Without this,
+                // the layer's `isGameEnabled()` sees an empty cache
+                // until a UI event triggers a re-broadcast.
+                let initial_enabled = enabled_games
+                    .lock()
+                    .map(|g| g.clone())
+                    .unwrap_or_default();
                 tokio::spawn(async move {
-                    if let Err(e) = serve_client(stream, cmd_rx, evt_tx).await {
+                    if let Err(e) = serve_client(stream, cmd_rx, evt_tx, initial_enabled).await {
                         log::debug!("ipc: client session ended: {e}");
                     }
                 });
@@ -232,8 +264,24 @@ async fn serve_client(
     mut stream: tokio::net::UnixStream,
     mut cmd_rx: broadcast::Receiver<FrontendCommand>,
     evt_tx: mpsc::Sender<LayerEvent>,
+    initial_enabled: Vec<GameId>,
 ) -> Result<(), IpcError> {
     let (mut read_half, mut write_half) = stream.split();
+
+    // First frame: the current enabled-games snapshot. Synchronous here
+    // so the layer has the list before its first `vkCreateSwapchainKHR`
+    // fires (the next frame after IPC connect is typically within ms).
+    {
+        let initial = FrontendCommand::GamesEnabledUpdate { enabled: initial_enabled };
+        let body = serde_json::to_vec(&initial)?;
+        let len = u32::try_from(body.len()).map_err(|_| IpcError::PayloadTooLarge(u32::MAX))?;
+        if len > MAX_PAYLOAD {
+            return Err(IpcError::PayloadTooLarge(len));
+        }
+        write_half.write_all(&len.to_le_bytes()).await?;
+        write_half.write_all(&body).await?;
+        write_half.flush().await?;
+    }
 
     loop {
         tokio::select! {

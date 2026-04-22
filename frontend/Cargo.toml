@@ -1,5 +1,5 @@
 [package]
-name = "game-filters-flatpak"
+name = "lumen"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
@@ -20,7 +20,7 @@ thiserror = "1.0"
 libc = "0.2"
 
 [[bin]]
-name = "game-filters-flatpak"
+name = "lumen"
 path = "src/main.rs"
 
 [profile.release]

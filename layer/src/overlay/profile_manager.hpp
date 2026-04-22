@@ -1,5 +1,5 @@
-#ifndef GFF_PROFILE_MANAGER_HPP_INCLUDED
-#define GFF_PROFILE_MANAGER_HPP_INCLUDED
+#ifndef LUMEN_PROFILE_MANAGER_HPP_INCLUDED
+#define LUMEN_PROFILE_MANAGER_HPP_INCLUDED
 
 #include <string>
 #include <vector>
@@ -10,14 +10,14 @@ namespace vkBasalt
     class ImGuiOverlay;
 }
 
-// Per-game profile management for the GameFiltersFlatpak overlay.
+// Per-game profile management for the Lumen overlay.
 //
 // Each game gets three profile slots stored at
-//     $XDG_CONFIG_HOME/game-filters-flatpak/games/<exe>/profile{1,2,3}.conf
+//     $XDG_CONFIG_HOME/lumen/games/<exe>/profile{1,2,3}.conf
 // plus an `active.txt` marker recording which slot the user last used.
 // On overlay init we pick up where the user left off; on slider change we
 // persist the current state to the active slot automatically.
-namespace gff
+namespace lumen
 {
     struct ProfileState
     {
@@ -58,22 +58,22 @@ namespace gff
     // --- Filter stack (add / remove / reorder) --------------------------
     //
     // The overlay exposes four cards — Brightness/Contrast, Color, Details,
-    // Effects — each backed by one effect in the chain (gff_tonal, gff_color,
-    // gff_local, gff_stylistic). Users activate cards with "+", remove with
+    // Effects — each backed by one effect in the chain (lumen_tonal, lumen_color,
+    // lumen_local, lumen_stylistic). Users activate cards with "+", remove with
     // "−", and reorder with "↑ ↓". State lives in the registry's selected-
     // effects list and is persisted to the active profile's `effects = ...`
     // line.
 
     struct CardSlider
     {
-        const char* key;    // Parameter key, e.g. "gff.exposure"
+        const char* key;    // Parameter key, e.g. "lumen.exposure"
         const char* label;  // Human-readable slider label
         const char* fmt;    // ImGui format string (e.g. "%.0f" or "%.0f\xc2\xb0")
     };
 
     struct CardDef
     {
-        const char*             effectName;  // Built-in effect name, e.g. "gff_tonal"
+        const char*             effectName;  // Built-in effect name, e.g. "lumen_tonal"
         const char*             title;       // Section header, e.g. "Brightness / Contrast"
         std::vector<CardSlider> sliders;     // Sliders owned by this card, in display order
     };
@@ -118,6 +118,22 @@ namespace gff
     // and fails for everything else. Cached on first call — the answer
     // doesn't change within a process lifetime.
     bool isGameProcess();
+
+    // Second-stage gate: is THIS specific game one the user has toggled
+    // ON in the frontend window? Checked at vkCreateSwapchainKHR after
+    // isGameProcess() passes. Matches the process's SteamAppId env var
+    // against the enabled Steam app-id set, OR its argv[0] basename
+    // against the enabled-exe basename set (populated from the scanner's
+    // manual-dir detections). Result is NOT cached — the enabled set
+    // mutates at runtime as `games-enabled-update` IPC messages arrive.
+    bool isGameEnabled();
+
+    // Parse a "games-enabled-update" IPC payload and replace the cached
+    // enabled-games sets atomically. Called from the IPC handler in
+    // basalt.cpp. Minimal hand-rolled JSON extraction (no JSON lib in
+    // the layer) — tolerates the exact shape the Rust frontend emits,
+    // doesn't attempt full JSON validation.
+    void applyEnabledGamesJson(const std::string& rawJson);
 }
 
-#endif // GFF_PROFILE_MANAGER_HPP_INCLUDED
+#endif // LUMEN_PROFILE_MANAGER_HPP_INCLUDED

@@ -14,17 +14,17 @@
 set -eu
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN="$REPO/frontend/target/debug/game-filters-flatpak"
-LOG="${GFF_LOG:-/tmp/gff.log}"
-SOCKET="${XDG_RUNTIME_DIR:-/tmp}/game-filters-flatpak.sock"
+BIN="$REPO/frontend/target/debug/lumen"
+LOG="${LUMEN_LOG:-/tmp/lumen.log}"
+SOCKET="${XDG_RUNTIME_DIR:-/tmp}/lumen.sock"
 
 # The implicit-layer manifest at ~/.local/share/vulkan/implicit_layer.d/
 # points at this absolute path. Builds land in layer/builddir; we copy
 # from there to here so freshly-built shaders/code actually load.
-LAYER_SRC="$REPO/layer/builddir/src/libgamefiltersflatpak.so"
-LAYER_DST="$HOME/.local/lib/libgamefiltersflatpak.so"
+LAYER_SRC="$REPO/layer/builddir/src/liblumen.so"
+LAYER_DST="$HOME/.local/lib/liblumen.so"
 MANIFEST_DIR="$HOME/.local/share/vulkan/implicit_layer.d"
-MANIFEST_DST="$MANIFEST_DIR/game-filters-flatpak.json"
+MANIFEST_DST="$MANIFEST_DIR/lumen.json"
 
 case "${1:-info}" in
   trace) LAYER_LEVEL=trace ; RUST_LEVEL=trace ;;
@@ -36,18 +36,26 @@ esac
 
 preflight_cleanup() {
   # Kill any frontend left over from a previous run (signal-safe — if none,
-  # pkill returns 1 which is fine).
-  pkill -TERM -f "target/debug/game-filters-flatpak" 2>/dev/null || true
-  pkill -TERM -f "target/release/game-filters-flatpak" 2>/dev/null || true
-  # Give them up to 2s to exit gracefully, then force-kill any stragglers.
+  # pkill returns 1 which is fine). Use `-x lumen` to match on exact process
+  # name (the binary's argv[0] basename); a looser substring match on "lumen"
+  # would hit random unrelated processes that happen to have the word
+  # somewhere in their cmdline.
+  pkill -TERM -x lumen 2>/dev/null || true
+  # Give it up to 2s to exit gracefully, then force-kill any strays.
   for _ in 1 2 3 4; do
-    pgrep -f "game-filters-flatpak" >/dev/null 2>&1 || break
+    pgrep -x lumen >/dev/null 2>&1 || break
     sleep 0.5
   done
-  pkill -KILL -f "game-filters-flatpak" 2>/dev/null || true
+  pkill -KILL -x lumen 2>/dev/null || true
   # Remove the socket; the layer IPC won't attempt to bind if a stale file
   # was left from an ungraceful exit.
   rm -f "$SOCKET"
+  # Remove legacy layer .so + manifest from the pre-Lumen naming so the
+  # Vulkan loader doesn't register both and load the absent old library.
+  rm -f "$HOME/.local/lib/libgamefiltersflatpak.so" \
+        "$HOME/.local/share/vulkan/implicit_layer.d/game-filters-flatpak.json" \
+        "$HOME/.local/share/vulkan/implicit_layer.d/nvidia-filters-flatpak.json" \
+        "$HOME/.local/lib/libnvidiafiltersflatpak.so"
 }
 
 postflight_cleanup() {
@@ -96,18 +104,18 @@ cat > "$MANIFEST_DST" <<EOF
 {
   "file_format_version" : "1.0.0",
   "layer" : {
-    "name": "VK_LAYER_GAMEFILTERSFLATPAK_post_processing",
+    "name": "VK_LAYER_LUMEN_post_processing",
     "type": "GLOBAL",
     "library_path": "$LAYER_DST",
     "api_version": "1.4.341",
     "implementation_version": "1",
-    "description": "GameFiltersFlatpak post-processing layer (dev install)",
+    "description": "Lumen post-processing layer (dev install)",
     "functions": {
-      "vkGetInstanceProcAddr": "gff_GetInstanceProcAddr",
-      "vkGetDeviceProcAddr":   "gff_GetDeviceProcAddr"
+      "vkGetInstanceProcAddr": "lumen_GetInstanceProcAddr",
+      "vkGetDeviceProcAddr":   "lumen_GetDeviceProcAddr"
     },
     "disable_environment": {
-      "GFF_DISABLE": "1"
+      "LUMEN_DISABLE": "1"
     }
   }
 }
@@ -125,17 +133,17 @@ echo "socket:          $SOCKET"
 echo "layer level:     $LAYER_LEVEL"
 echo "rust level:      $RUST_LEVEL"
 echo ""
-echo "If a KDE portal dialog appears asking to allow Game Filters to"
+echo "If a KDE portal dialog appears asking to allow Lumen to"
 echo "register a global shortcut — click ALLOW. If you dismiss it, the"
 echo "hotkey won't work this session."
 echo ""
 echo "To capture a Steam game's layer output into the same log file, add"
 echo "this to the game's Launch Options in Steam (one-time setup):"
-echo "  GFF_LOG_FILE=$LOG GFF_LOG_LEVEL=$LAYER_LEVEL %command%"
+echo "  LUMEN_LOG_FILE=$LOG LUMEN_LOG_LEVEL=$LAYER_LEVEL %command%"
 echo "---"
 
-export GFF_LOG_FILE="$LOG"
-export GFF_LOG_LEVEL="$LAYER_LEVEL"
+export LUMEN_LOG_FILE="$LOG"
+export LUMEN_LOG_LEVEL="$LAYER_LEVEL"
 export RUST_LOG="$RUST_LEVEL"
 export RUST_BACKTRACE=1
 

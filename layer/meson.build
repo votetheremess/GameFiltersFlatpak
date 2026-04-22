@@ -8,7 +8,7 @@
 # names), and loader model (removed enable_environment so we load implicitly).
 
 project(
-  'game-filters-flatpak-layer',
+  'lumen-layer',
   ['c', 'cpp'],
   version: '0.1.0',
   license: 'Zlib',
@@ -23,7 +23,7 @@ project(
 
 cpp = meson.get_compiler('cpp')
 
-layer_lib_name = 'gamefiltersflatpak'
+layer_lib_name = 'lumen'
 layer_include_path = include_directories('src')
 layer_lib_dir = get_option('libdir')
 

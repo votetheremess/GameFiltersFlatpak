@@ -1,4 +1,4 @@
-// GameFiltersFlatpak — color / chroma pass.
+// Lumen — color / chroma pass.
 // Tint Color, Tint Intensity, Temperature, Vibrance. All operate on
 // hue / saturation axes; no neighbor sampling, no tonal interaction
 // beyond what the caller has already baked in via preceding passes.

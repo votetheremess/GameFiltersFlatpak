@@ -1,4 +1,4 @@
-#include "theme_gff.hpp"
+#include "theme_lumen.hpp"
 
 #include <array>
 #include <sys/stat.h>
@@ -6,7 +6,7 @@
 #include "imgui/imgui.h"
 #include "logger.hpp"
 
-namespace gff
+namespace lumen
 {
     namespace
     {
@@ -165,9 +165,9 @@ namespace gff
         const ImVec4 border_shadow = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
         const ImVec4 text         = ImVec4(0.95f, 0.96f, 0.98f, 1.00f);
         const ImVec4 text_dim     = ImVec4(0.60f, 0.63f, 0.70f, 1.00f);
-        const ImVec4 accent       = ImVec4(0.46f, 0.76f, 1.00f, 0.85f);   // rgba(118, 195, 255, 0.85)
-        const ImVec4 accent_hov   = ImVec4(0.55f, 0.82f, 1.00f, 0.95f);
-        const ImVec4 accent_act   = ImVec4(0.70f, 0.88f, 1.00f, 1.00f);
+        const ImVec4 accent       = ImVec4(0.00f, 0.96f, 1.00f, 0.85f);   // #00F5FF electric cyan
+        const ImVec4 accent_hov   = ImVec4(0.30f, 1.00f, 1.00f, 0.95f);   // brighter hover variant
+        const ImVec4 accent_act   = ImVec4(0.60f, 1.00f, 1.00f, 1.00f);   // pressed — almost-white cyan
 
         ImVec4* c = style.Colors;
         c[ImGuiCol_Text]                  = text;
@@ -220,4 +220,4 @@ namespace gff
         c[ImGuiCol_DragDropTarget]        = accent;
         c[ImGuiCol_NavHighlight]          = accent;
     }
-} // namespace gff
+} // namespace lumen
